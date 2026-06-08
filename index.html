@@ -839,6 +839,12 @@ footer {
           <input class="measure-input" type="number" id="m_len" placeholder="60" min="30" max="130">
         </div>
       </div>
+      <div style="display:flex;gap:8px;margin-top:0.75rem;">
+        <button class="btn-outline" style="flex:1;padding:10px;font-size:13px;" onclick="saveMeasures()">💾 Сохранить мерки</button>
+        <button class="btn-outline" style="flex:1;padding:10px;font-size:13px;" onclick="loadMeasures()" id="loadBtn" style="display:none;">📂 Загрузить сохранённые</button>
+      </div>
+      <div id="saveNotice" style="display:none;background:#e8f5e9;border-radius:var(--radius);padding:10px 14px;margin-top:8px;font-size:13px;color:#2e7d32;">✓ Мерки сохранены! В следующий раз нажмите "Загрузить сохранённые".</div>
+
       <div class="measure-tip">
         <svg viewBox="0 0 24 24"><path d="M3 12h18M12 3v18"/><circle cx="12" cy="12" r="3"/></svg>
         <p>Мерная лента должна лежать горизонтально, параллельно полу. Грудь — по наиболее выступающим точкам. Талия — по самому тонкому месту. Бёдра — на 18–20 см ниже талии.</p>
@@ -1099,6 +1105,7 @@ function goToStep(n) {
   document.getElementById('step'+n).classList.add('active');
   document.getElementById('pb'+n).classList.add('active');
   document.getElementById('creator').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  if (n === 2) checkSavedMeasures();
 }
 
 // Chips
@@ -1368,6 +1375,41 @@ function getMaterials() {
   const partsList = (d.parts||[]).map(p=>`${p.name}: ${p.width}×${p.height} см (×${p.qty})`).join('\n');
   const text = `Список материалов для: ${d.model_name}\n\nТкань: ${d.fabric_amount}\n\nДетали:\n${partsList}\n\nТакже понадобится:\n• Нитки в цвет ткани\n• Швейные иглы\n• Мел или маркер для ткани\n• Ножницы для ткани\n• Утюг и гладильная доска\n• Сантиметровая лента\n• Булавки\n${d.model_name.includes('юбк') || d.model_name.includes('брюк') ? '• Молния 20 см\n• Резинка или пояс' : '• Пуговицы или застёжка'}`;
   alert(text);
+}
+
+function saveMeasures() {
+  const data = {
+    chest: document.getElementById('m_chest').value,
+    waist: document.getElementById('m_waist').value,
+    hips: document.getElementById('m_hips').value,
+    height: document.getElementById('m_height').value,
+    back: document.getElementById('m_back').value,
+    len: document.getElementById('m_len').value
+  };
+  localStorage.setItem('sewing_measures', JSON.stringify(data));
+  const notice = document.getElementById('saveNotice');
+  notice.style.display = 'block';
+  document.getElementById('loadBtn').style.display = 'block';
+  setTimeout(() => notice.style.display = 'none', 3000);
+}
+
+function loadMeasures() {
+  const saved = localStorage.getItem('sewing_measures');
+  if (!saved) return;
+  const data = JSON.parse(saved);
+  document.getElementById('m_chest').value = data.chest || '';
+  document.getElementById('m_waist').value = data.waist || '';
+  document.getElementById('m_hips').value = data.hips || '';
+  document.getElementById('m_height').value = data.height || '';
+  document.getElementById('m_back').value = data.back || '';
+  document.getElementById('m_len').value = data.len || '';
+}
+
+function checkSavedMeasures() {
+  if (localStorage.getItem('sewing_measures')) {
+    document.getElementById('loadBtn').style.display = 'block';
+    loadMeasures();
+  }
 }
 
 function resetCreator() {
