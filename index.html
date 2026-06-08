@@ -6,6 +6,8 @@
 <title>Выкройка — AI-конструктор одежды</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -558,6 +560,46 @@ footer {
   font-size: 14px; color: #991b1b; display: none;
 }
 .error-box.show { display: block; }
+
+/* Cropper modal */
+.crop-modal {
+  display: none; position: fixed; inset: 0; z-index: 1000;
+  background: rgba(0,0,0,0.85);
+  align-items: center; justify-content: center;
+  padding: 1rem;
+}
+.crop-modal.open { display: flex; }
+.crop-box {
+  background: var(--white); border-radius: var(--radius-lg);
+  padding: 1.5rem; max-width: 700px; width: 100%;
+  max-height: 90vh; display: flex; flex-direction: column; gap: 1rem;
+}
+.crop-box h3 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 22px; font-weight: 500;
+}
+.crop-img-wrap { max-height: 50vh; overflow: hidden; border-radius: 8px; background: #000; }
+.crop-img-wrap img { max-width: 100%; display: block; }
+.crop-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+/* Description field */
+.desc-field {
+  background: var(--cream); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px 16px;
+  margin-top: 1rem; transition: border-color 0.2s;
+}
+.desc-field:focus-within { border-color: var(--accent); }
+.desc-label {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--ink-muted); font-weight: 500; margin-bottom: 6px;
+}
+.desc-input {
+  width: 100%; border: none; background: transparent;
+  font-family: 'DM Sans', sans-serif; font-size: 15px;
+  color: var(--ink); outline: none; resize: none;
+  line-height: 1.5;
+}
+.desc-input::placeholder { color: var(--border-strong); }
 </style>
 </head>
 <body>
@@ -750,6 +792,17 @@ footer {
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
         <span><strong>Подходят</strong> фото из каталогов, скриншоты с сайтов, фото из Instagram. Чем лучше видна конструкция одежды — тем точнее будет выкройка.</span>
       </div>
+      <div class="desc-field">
+        <div class="desc-label">Опишите что именно нужно сшить (необязательно)</div>
+        <textarea class="desc-input" id="modelDescription" rows="2" placeholder="Например: жилетка без рукавов с V-образным вырезом, застёжка на пуговицы..."></textarea>
+      </div>
+
+      <div id="cropBtnWrap" style="display:none;margin-top:0.75rem;">
+        <button class="btn-outline" style="width:100%;padding:11px;font-size:13px;" onclick="openCropper()">
+          ✂️ Обрезать фото — выбрать нужное изделие
+        </button>
+      </div>
+
       <div class="step-nav">
         <div></div>
         <button class="btn-primary" onclick="goToStep(2)">Далее →</button>
@@ -957,6 +1010,21 @@ footer {
   <div class="footer-copy">AI-конструктор одежды · 2024 · Бесплатно</div>
 </footer>
 
+<!-- Crop Modal -->
+<div class="crop-modal" id="cropModal">
+  <div class="crop-box">
+    <h3>Выберите область с изделием</h3>
+    <p style="font-size:13px;color:var(--ink-muted);">Обрежьте фото так, чтобы было видно только нужное изделие</p>
+    <div class="crop-img-wrap">
+      <img id="cropImage" src="" alt="Кадрирование">
+    </div>
+    <div class="crop-actions">
+      <button class="btn-outline" style="padding:10px 20px;font-size:13px;" onclick="closeCropper()">Отмена</button>
+      <button class="btn-primary" style="padding:10px 24px;font-size:13px;" onclick="applyCrop()">✓ Применить обрезку</button>
+    </div>
+  </div>
+</div>
+
 <script>
 let uploadedImageData = null;
 let currentStep = 1;
@@ -978,15 +1046,48 @@ function handleDrop(e) {
 function handleFileSelect(input) {
   if (input.files[0]) processFile(input.files[0]);
 }
+let cropperInstance = null;
+let originalImageData = null;
+
 function processFile(file) {
   const reader = new FileReader();
   reader.onload = e => {
     uploadedImageData = e.target.result;
+    originalImageData = e.target.result;
     const area = document.getElementById('uploadArea');
     area.innerHTML = '<img src="' + e.target.result + '" alt="Загруженное фото модели" style="max-height:280px;max-width:100%;border-radius:8px;object-fit:contain;pointer-events:none;"><div style="margin-top:12px;font-size:13px;color:var(--accent);font-weight:500;pointer-events:none;">✓ Фото загружено · нажмите чтобы изменить</div>';
     area.classList.add('has-image');
+    document.getElementById('cropBtnWrap').style.display = 'block';
   };
   reader.readAsDataURL(file);
+}
+
+function openCropper() {
+  const modal = document.getElementById('cropModal');
+  const img = document.getElementById('cropImage');
+  img.src = originalImageData || uploadedImageData;
+  modal.classList.add('open');
+  setTimeout(() => {
+    if (cropperInstance) { cropperInstance.destroy(); cropperInstance = null; }
+    cropperInstance = new Cropper(img, {
+      viewMode: 1, autoCropArea: 0.8,
+      movable: true, zoomable: true, rotatable: false,
+    });
+  }, 200);
+}
+
+function closeCropper() {
+  document.getElementById('cropModal').classList.remove('open');
+  if (cropperInstance) { cropperInstance.destroy(); cropperInstance = null; }
+}
+
+function applyCrop() {
+  if (!cropperInstance) return;
+  const canvas = cropperInstance.getCroppedCanvas({ maxWidth: 1200, maxHeight: 1200 });
+  uploadedImageData = canvas.toDataURL('image/jpeg', 0.9);
+  const area = document.getElementById('uploadArea');
+  area.innerHTML = '<img src="' + uploadedImageData + '" alt="Обрезанное фото" style="max-height:280px;max-width:100%;border-radius:8px;object-fit:contain;pointer-events:none;"><div style="margin-top:12px;font-size:13px;color:var(--accent);font-weight:500;pointer-events:none;">✓ Фото обрезано · нажмите чтобы изменить</div>';
+  closeCropper();
 }
 
 // Navigation
@@ -1051,9 +1152,10 @@ async function startGeneration() {
     }
   }, 1800);
 
+  const userDesc = document.getElementById('modelDescription').value.trim();
   const imageContext = uploadedImageData
-    ? `Внимательно посмотри на приложенное фото одежды. Определи точно: тип изделия, фасон, конструктивные особенности (наличие рукавов, воротника, застёжки, карманов, вытачек, кокеток и т.д.). Создай выкройку именно этой модели.`
-    : `Фото модели не загружено. Создай универсальную выкройку базового изделия.`;
+    ? `Внимательно посмотри на приложенное фото одежды. ${userDesc ? 'Пользователь уточняет: "' + userDesc + '". Создай выкройку именно этого изделия.' : 'Определи точно: тип изделия, фасон, конструктивные особенности (наличие рукавов, воротника, застёжки, карманов, вытачек, кокеток и т.д.). Создай выкройку именно этой модели.'}`
+    : `Фото модели не загружено. ${userDesc ? 'Пользователь хочет сшить: "' + userDesc + '". Создай выкройку этого изделия.' : 'Создай универсальную выкройку базового изделия.'}`;
 
   const prompt = `Ты — профессиональный конструктор одежды с 20-летним опытом. Создай точную выкройку по следующим данным.
 
@@ -1278,6 +1380,9 @@ function resetCreator() {
   });
   document.getElementById('pb1').classList.add('active');
   uploadedImageData = null;
+  originalImageData = null;
+  document.getElementById('modelDescription').value = '';
+  document.getElementById('cropBtnWrap').style.display = 'none';
   const area = document.getElementById('uploadArea');
   area.innerHTML = '<div class="upload-icon"><svg viewBox="0 0 56 56" xmlns="http://www.w3.org/2000/svg"><path d="M28 36V20M28 20L22 26M28 20L34 26"/><rect x="8" y="8" width="40" height="40" rx="4"/><path d="M8 38L18 28L24 34L32 24L48 38"/></svg></div><div class="upload-main">Нажмите или перетащите сюда фото</div><div class="upload-sub">JPG, PNG, WEBP · до 10 МБ</div>';
   area.classList.remove('has-image');
