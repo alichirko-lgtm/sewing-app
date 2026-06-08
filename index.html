@@ -1198,9 +1198,11 @@ async function startGeneration() {
   }, 1800);
 
   const userDesc = document.getElementById('modelDescription').value.trim();
-  const imageContext = uploadedImageData
-    ? `Внимательно посмотри на приложенное фото одежды. ${userDesc ? 'Пользователь уточняет: "' + userDesc + '". Создай выкройку именно этого изделия.' : 'Определи точно: тип изделия, фасон, конструктивные особенности (наличие рукавов, воротника, застёжки, карманов, вытачек, кокеток и т.д.). Создай выкройку именно этой модели.'}`
-    : `Фото модели не загружено. ${userDesc ? 'Пользователь хочет сшить: "' + userDesc + '". Создай выкройку этого изделия.' : 'Создай универсальную выкройку базового изделия.'}`;
+  // Force the item type into model_name instruction
+  const forceItem = userDesc ? `КРИТИЧЕСКИ ВАЖНО: пользователь хочет "${userDesc}". model_name ОБЯЗАН содержать "${userDesc}". Если на фото этот предмет — опиши его. Построй выкройку именно для: ${userDesc}.` : '';
+    const imageContext = uploadedImageData
+    ? `${forceItem} Внимательно посмотри на фото. Определи тип изделия, фасон, конструкцию.`
+    : `${forceItem} Фото не загружено. ${userDesc ? '' : 'Создай базовую выкройку.'}\`;
 
   const prompt = `Ты — профессиональный конструктор одежды с 20-летним опытом. Создай точную выкройку по следующим данным.
 
@@ -1248,6 +1250,12 @@ ${imageContext}
 - model_name — конкретное название (например: "Прямое платье-рубашка", "Блузка с воротником-стойкой")`;
 
   try {
+    // Debug: show what's being sent
+    console.log('=== ОТПРАВКА В API ===');
+    console.log('Описание:', userDesc);
+    console.log('Фото загружено:', !!uploadedImageData);
+    console.log('imageContext:', imageContext);
+
     // Build message content - include image if uploaded
     let msgContent;
     if (uploadedImageData) {
