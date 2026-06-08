@@ -1,1483 +1,682 @@
-const prompt = `Ты — профессиональный конструктор одежды. Твоя задача — построить точную выкройку по академическим методам (ЦОТШЛ/Мюллер).
-
-${imageContext}
-
-МЕРКИ КЛИЕНТА:
-- Обхват груди (Сг): ${chest} см
-- Обхват талии (Ст): ${waist} см
-- Обхват бёдер (Сб): ${hips} см
-- Рост: ${height} см
-- Длина спины до талии: ${back} см
-- Желаемая длина: ${len} см
-
-ПАРАМЕТРЫ: сложность — ${level}, ткань — ${fabric}, припуски — ${sa} см
-
-ПРИБАВКИ НА СВОБОДУ (прибавь к меркам):
-- Платье/блузка: к груди +5 см, к талии +3 см, к бёдрам +3 см
-- Жилет/жакет: к груди +3 см, к талии +2 см, к бёдрам +2 см
-- Юбка: к талии +1 см, к бёдрам +2 см
-
-ФОРМУЛЫ РАСЧЁТА (ИСПОЛЬЗУЙ АКТУАЛЬНЫЕ ЦИФРЫ МЕРОК):
-Спинка: ширина = Сг/2 + Пг/2 + ${sa} см; длина = ${len} + ${sa}*2 см
-Полочка: ширина = Сг/2 + Пг/2 + ${sa} см; длина = ${len} + ${sa}*2 см
-Рукав (если есть): ширина = (Сг + Пг) / 4 + 3 см; длина = рост * 0.32
-Пояс: ширина = Ст + 4 см; высота = 4-8 см
-
-Верни ТОЛЬКО JSON без markdown:
-{
-  "model_name": "точное название изделия как на фото",
-  "description": "описание фасона",
-  "fabric_amount": "X.X метра",
-  "time_estimate": "время пошива",
-  "parts": [
-    {"name": "название", "width": число, "height": число, "qty": число, "note": "примечание"}
-  ],
-  "steps": ["шаг 1", "шаг 2"],
-  "tip": "совет"
-}
-
-ВАЖНО: model_name ДОЛЖЕН точно отражать что изображено на фото — жилет, юбка, блузка и т..д. НИКОГДА не пиши платье если пользователь написал или показал другое. Шагов 7-9, подробно.`<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Выкройка — AI-конструктор одежды</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<title>Выкройка — AI конструктор</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:#F5F0E8;color:#1A1714;min-height:100vh}
+nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:1rem 5vw;background:rgba(245,240,232,0.95);backdrop-filter:blur(10px);border-bottom:1px solid rgba(26,23,20,0.1)}
+.logo{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;color:#1A1714;text-decoration:none}
+.nav-btn{background:#1A1714;color:#F5F0E8;padding:9px 22px;border:none;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;transition:.2s}
+.nav-btn:hover{background:#C4622D}
 
-:root {
-  --cream: #F5F0E8;
-  --cream-dark: #EDE5D4;
-  --ink: #1A1714;
-  --ink-soft: #3D3730;
-  --ink-muted: #7A6F65;
-  --accent: #C4622D;
-  --accent-light: #E8956A;
-  --accent-pale: #F5E6DB;
-  --thread: #8B7355;
-  --white: #FDFAF6;
-  --border: rgba(26,23,20,0.12);
-  --border-strong: rgba(26,23,20,0.25);
-  --radius: 4px;
-  --radius-lg: 12px;
-}
+/* HERO */
+.hero{min-height:100vh;display:flex;align-items:center;justify-content:center;text-align:center;padding:8rem 5vw 4rem}
+.hero-inner{max-width:700px}
+.hero-tag{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#C4622D;font-weight:500;margin-bottom:1.5rem}
+h1{font-family:'Cormorant Garamond',serif;font-size:clamp(48px,7vw,90px);font-weight:500;line-height:1.05;margin-bottom:1.5rem}
+h1 em{font-style:italic;color:#C4622D}
+.hero-desc{font-size:18px;color:#7A6F65;line-height:1.7;margin-bottom:2.5rem;max-width:500px;margin-inline:auto}
+.btn-main{background:#1A1714;color:#F5F0E8;padding:15px 36px;border:none;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;transition:.2s;display:inline-block;text-decoration:none}
+.btn-main:hover{background:#C4622D}
 
-html { scroll-behavior: smooth; }
+/* APP SECTION */
+#app{background:#FDFAF6;padding:5rem 0}
+.app-inner{max-width:800px;margin:0 auto;padding:0 5vw}
+.app-title{font-family:'Cormorant Garamond',serif;font-size:clamp(32px,4vw,52px);font-weight:500;text-align:center;margin-bottom:.5rem}
+.app-sub{text-align:center;color:#7A6F65;font-size:16px;margin-bottom:3rem}
 
-body {
-  font-family: 'DM Sans', sans-serif;
-  background: var(--cream);
-  color: var(--ink);
-  font-size: 16px;
-  line-height: 1.6;
-  min-height: 100vh;
-}
+/* STEPS NAV */
+.steps-nav{display:flex;justify-content:center;gap:0;margin-bottom:3rem;position:relative}
+.steps-nav::before{content:'';position:absolute;top:18px;left:15%;right:15%;height:1px;background:rgba(26,23,20,0.15);z-index:0}
+.sn-item{display:flex;flex-direction:column;align-items:center;gap:6px;flex:1;z-index:1;cursor:pointer}
+.sn-dot{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500;background:#F5F0E8;border:1.5px solid rgba(26,23,20,0.2);color:#7A6F65;transition:.25s}
+.sn-item.active .sn-dot{background:#1A1714;color:#F5F0E8;border-color:#1A1714}
+.sn-item.done .sn-dot{background:#C4622D;color:#fff;border-color:#C4622D}
+.sn-label{font-size:12px;color:#7A6F65}
+.sn-item.active .sn-label{color:#1A1714;font-weight:500}
 
-/* ── NAV ── */
-nav {
-  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 1.25rem 4vw;
-  background: rgba(245,240,232,0.9);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--border);
-}
-.nav-logo {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: 22px; font-weight: 600;
-  color: var(--ink); text-decoration: none;
-  display: flex; align-items: center; gap: 10px;
-}
-.nav-logo svg { width: 28px; height: 28px; }
-.nav-cta {
-  background: var(--ink); color: var(--cream);
-  padding: 9px 22px; border-radius: 2px;
-  font-size: 13px; font-weight: 500; letter-spacing: 0.04em;
-  text-decoration: none; text-transform: uppercase;
-  transition: background 0.2s;
-}
-.nav-cta:hover { background: var(--accent); }
+/* STEP PANELS */
+.step-panel{display:none}
+.step-panel.active{display:block;animation:fadeUp .3s ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.step-h{font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:500;margin-bottom:.4rem}
+.step-sh{font-size:14px;color:#7A6F65;margin-bottom:1.5rem}
 
-/* ── HERO ── */
-.hero {
-  min-height: 100vh;
-  display: grid; grid-template-columns: 1fr 1fr;
-  padding-top: 72px;
-  overflow: hidden;
-}
-.hero-left {
-  display: flex; flex-direction: column; justify-content: center;
-  padding: 6vw 5vw 6vw 8vw;
-  position: relative;
-}
-.hero-tag {
-  display: inline-flex; align-items: center; gap: 8px;
-  font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
-  color: var(--accent); font-weight: 500;
-  margin-bottom: 1.5rem;
-}
-.hero-tag::before {
-  content: ''; display: block;
-  width: 32px; height: 1px; background: var(--accent);
-}
-h1 {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: clamp(48px, 6vw, 84px);
-  font-weight: 500; line-height: 1.05;
-  color: var(--ink);
-  margin-bottom: 1.5rem;
-}
-h1 em { font-style: italic; color: var(--accent); }
-.hero-desc {
-  font-size: 17px; color: var(--ink-muted); line-height: 1.7;
-  max-width: 460px; margin-bottom: 2.5rem;
-}
-.hero-btns { display: flex; gap: 12px; flex-wrap: wrap; }
-.btn-primary {
-  background: var(--ink); color: var(--cream);
-  padding: 14px 32px; border-radius: 2px;
-  font-family: 'DM Sans', sans-serif;
-  font-size: 14px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase;
-  text-decoration: none; border: none; cursor: pointer;
-  transition: background 0.2s, transform 0.15s;
-  display: inline-block;
-}
-.btn-primary:hover { background: var(--accent); transform: translateY(-1px); }
-.btn-outline {
-  background: transparent; color: var(--ink);
-  padding: 14px 32px; border-radius: 2px;
-  font-family: 'DM Sans', sans-serif;
-  font-size: 14px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase;
-  text-decoration: none; border: 1.5px solid var(--ink); cursor: pointer;
-  transition: all 0.2s;
-  display: inline-block;
-}
-.btn-outline:hover { background: var(--ink); color: var(--cream); }
-.hero-stats {
-  display: flex; gap: 2rem; margin-top: 3rem;
-  padding-top: 2rem; border-top: 1px solid var(--border);
-}
-.stat-num {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: 32px; font-weight: 600; color: var(--ink); line-height: 1;
-}
-.stat-label { font-size: 12px; color: var(--ink-muted); margin-top: 2px; }
+/* UPLOAD */
+.upload-box{border:2px dashed rgba(26,23,20,0.25);border-radius:12px;padding:3rem 2rem;text-align:center;cursor:pointer;transition:.2s;background:#F5F0E8;position:relative;overflow:hidden}
+.upload-box:hover{border-color:#C4622D;background:#FBF5EF}
+.upload-box.loaded{border-style:solid;border-color:#C4622D;padding:1rem}
+.upload-box.loaded img{max-height:260px;max-width:100%;border-radius:8px;object-fit:contain;display:block;margin:0 auto}
+.upload-icon{font-size:40px;margin-bottom:1rem;opacity:.4}
+.upload-main{font-size:16px;font-weight:500;margin-bottom:.25rem}
+.upload-sub{font-size:13px;color:#7A6F65}
+.upload-change{margin-top:.75rem;font-size:13px;color:#C4622D;font-weight:500}
 
-/* Hero right — illustration */
-.hero-right {
-  background: var(--cream-dark);
-  position: relative; overflow: hidden;
-  display: flex; align-items: center; justify-content: center;
-}
-.pattern-illustration {
-  width: 100%; height: 100%;
-  position: absolute; inset: 0;
-}
+/* DESC FIELD */
+.field{margin-top:1rem}
+.field-label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#7A6F65;font-weight:500;margin-bottom:.4rem}
+.field textarea,.field input[type=number]{width:100%;border:1.5px solid rgba(26,23,20,0.15);border-radius:6px;padding:12px 14px;font-family:'DM Sans',sans-serif;font-size:15px;color:#1A1714;background:#F5F0E8;outline:none;transition:.2s;resize:none}
+.field textarea:focus,.field input[type=number]:focus{border-color:#C4622D}
+.field textarea::placeholder,.field input[type=number]::placeholder{color:rgba(26,23,20,0.3)}
 
-/* ── HOW IT WORKS ── */
-.section {
-  padding: 7rem 8vw;
-}
-.section-eyebrow {
-  font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
-  color: var(--accent); font-weight: 500; margin-bottom: 0.75rem;
-  display: flex; align-items: center; gap: 8px;
-}
-.section-eyebrow::before {
-  content: ''; width: 28px; height: 1px; background: var(--accent);
-}
-h2 {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: clamp(36px, 4vw, 56px);
-  font-weight: 500; line-height: 1.1; color: var(--ink);
-  margin-bottom: 3rem;
-}
-.steps-grid {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px;
-  margin-top: 3rem;
-}
-.step-card {
-  background: var(--white);
-  padding: 2.5rem 2rem;
-  border: 1px solid var(--border);
-  position: relative; overflow: hidden;
-  transition: transform 0.2s;
-}
-.step-card:hover { transform: translateY(-3px); }
-.step-num {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: 72px; font-weight: 400; line-height: 1;
-  color: var(--border-strong); position: absolute;
-  right: 1.5rem; top: 1rem; pointer-events: none;
-}
-.step-icon {
-  width: 48px; height: 48px;
-  background: var(--accent-pale);
-  border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  margin-bottom: 1.25rem;
-}
-.step-icon svg { width: 22px; height: 22px; stroke: var(--accent); fill: none; stroke-width: 1.8; }
-.step-title {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: 22px; font-weight: 600; margin-bottom: 0.5rem;
-}
-.step-desc { font-size: 14px; color: var(--ink-muted); line-height: 1.6; }
+/* MEASURES */
+.meas-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:1rem}
+.meas-item{background:#F5F0E8;border:1.5px solid rgba(26,23,20,0.12);border-radius:8px;padding:12px 14px;transition:.2s}
+.meas-item:focus-within{border-color:#C4622D}
+.meas-label{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#7A6F65;font-weight:500;margin-bottom:4px;display:flex;justify-content:space-between}
+.meas-label span{background:#EDE5D4;color:#8B7355;padding:1px 7px;border-radius:20px;font-size:10px}
+.meas-input{width:100%;border:none;background:transparent;font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:500;color:#1A1714;outline:none;-moz-appearance:textfield}
+.meas-input::-webkit-outer-spin-button,.meas-input::-webkit-inner-spin-button{-webkit-appearance:none}
+.meas-input::placeholder{color:rgba(26,23,20,0.2)}
+.save-row{display:flex;gap:8px;margin-bottom:1rem}
+.btn-sm{flex:1;padding:10px;border:1.5px solid rgba(26,23,20,0.2);border-radius:6px;background:transparent;font-family:'DM Sans',sans-serif;font-size:13px;color:#1A1714;cursor:pointer;transition:.2s}
+.btn-sm:hover{border-color:#1A1714}
+.save-ok{background:#e8f5e9;border-radius:6px;padding:8px 12px;font-size:13px;color:#2e7d32;display:none;margin-bottom:.5rem}
 
-/* ── CREATOR SECTION ── */
-#creator {
-  background: var(--white);
-  padding: 6rem 0;
-}
-.creator-inner {
-  max-width: 900px; margin: 0 auto; padding: 0 4vw;
-}
-.creator-header { text-align: center; margin-bottom: 3rem; }
-.creator-header p { font-size: 17px; color: var(--ink-muted); max-width: 500px; margin: 0.75rem auto 0; }
+/* OPTIONS */
+.opt-label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#7A6F65;font-weight:500;margin-bottom:.6rem;margin-top:1.25rem}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{padding:8px 18px;border:1.5px solid rgba(26,23,20,0.2);border-radius:2px;font-size:13px;cursor:pointer;color:#7A6F65;background:transparent;transition:.15s;font-family:'DM Sans',sans-serif}
+.chip:hover{border-color:#1A1714;color:#1A1714}
+.chip.sel{background:#1A1714;color:#F5F0E8;border-color:#1A1714}
 
-/* Progress */
-.progress-bar {
-  display: flex; align-items: center; justify-content: center;
-  gap: 0; margin-bottom: 3rem; position: relative;
-}
-.progress-bar::before {
-  content: ''; position: absolute;
-  top: 50%; left: 0; right: 0; height: 1px;
-  background: var(--border); transform: translateY(-50%);
-  z-index: 0;
-}
-.pb-step {
-  display: flex; flex-direction: column; align-items: center;
-  gap: 6px; position: relative; z-index: 1; flex: 1;
-  cursor: pointer;
-}
-.pb-dot {
-  width: 36px; height: 36px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 13px; font-weight: 500;
-  background: var(--cream); border: 1.5px solid var(--border);
-  color: var(--ink-muted); transition: all 0.25s;
-}
-.pb-step.active .pb-dot {
-  background: var(--ink); color: var(--cream); border-color: var(--ink);
-}
-.pb-step.done .pb-dot {
-  background: var(--accent); color: white; border-color: var(--accent);
-}
-.pb-label { font-size: 12px; color: var(--ink-muted); white-space: nowrap; }
-.pb-step.active .pb-label { color: var(--ink); font-weight: 500; }
+/* NAV BUTTONS */
+.step-nav{display:flex;justify-content:space-between;align-items:center;margin-top:2rem;padding-top:1.5rem;border-top:1px solid rgba(26,23,20,0.1)}
+.btn-back{background:transparent;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:14px;color:#7A6F65;padding:0;transition:.2s}
+.btn-back:hover{color:#1A1714}
+.btn-next{background:#1A1714;color:#F5F0E8;padding:13px 30px;border:none;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;transition:.2s}
+.btn-next:hover{background:#C4622D}
+.btn-generate{background:#C4622D;color:#fff;padding:14px 36px;border:none;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;transition:.2s;width:100%;margin-top:1.5rem}
+.btn-generate:hover{background:#A0511E}
 
-/* Steps */
-.creator-step { display: none; }
-.creator-step.active { display: block; animation: fadeUp 0.3s ease; }
-@keyframes fadeUp {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-.step-heading {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: 32px; font-weight: 500; margin-bottom: 0.5rem;
-}
-.step-subheading { font-size: 15px; color: var(--ink-muted); margin-bottom: 2rem; }
+/* LOADING */
+.loading{display:none;text-align:center;padding:4rem 2rem}
+.loading.show{display:block;animation:fadeUp .3s ease}
+.spinner{width:50px;height:50px;border:3px solid #EDE5D4;border-top-color:#C4622D;border-radius:50%;animation:spin .9s linear infinite;margin:0 auto 1.5rem}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-title{font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:500;margin-bottom:.5rem}
+.loading-msg{font-size:14px;color:#7A6F65}
 
-/* Upload */
-.upload-area {
-  border: 1.5px dashed var(--border-strong);
-  border-radius: var(--radius-lg);
-  padding: 3.5rem 2rem;
-  text-align: center;
-  cursor: pointer;
-  transition: all 0.2s;
-  background: var(--cream);
-  position: relative;
-}
-.upload-area:hover, .upload-area.drag { border-color: var(--accent); background: var(--accent-pale); }
-.upload-area.has-image { padding: 1rem; border-style: solid; border-color: var(--accent); }
-.upload-area.has-image img { max-height: 280px; max-width: 100%; border-radius: 8px; object-fit: contain; }
-.upload-icon { width: 56px; height: 56px; margin: 0 auto 1rem; opacity: 0.4; }
-.upload-icon svg { width: 56px; height: 56px; stroke: var(--ink); fill: none; stroke-width: 1.2; }
-.upload-main { font-size: 16px; font-weight: 500; color: var(--ink); margin-bottom: 4px; }
-.upload-sub { font-size: 13px; color: var(--ink-muted); }
-.upload-hint-box {
-  background: var(--accent-pale); border-radius: var(--radius);
-  padding: 12px 16px; margin-top: 1.5rem;
-  display: flex; align-items: flex-start; gap: 10px;
-  text-align: left;
-}
-.upload-hint-box svg { width: 18px; height: 18px; flex-shrink: 0; stroke: var(--accent); fill: none; stroke-width: 1.8; margin-top: 1px; }
-.upload-hint-box span { font-size: 13px; color: var(--ink-soft); line-height: 1.5; }
+/* RESULT */
+.result{display:none}
+.result.show{display:block;animation:fadeUp .4s ease}
+.result-hero{background:#1A1714;color:#F5F0E8;border-radius:12px;padding:2rem 2.5rem;margin-bottom:1.5rem}
+.result-tag{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#E8956A;margin-bottom:.5rem}
+.result-name{font-family:'Cormorant Garamond',serif;font-size:36px;font-weight:500;margin-bottom:.5rem}
+.result-desc{font-size:14px;color:rgba(245,240,232,.6);line-height:1.6;margin-bottom:1rem}
+.result-meta{display:flex;flex-wrap:wrap;gap:1.5rem;font-size:13px;color:rgba(245,240,232,.5);border-top:1px solid rgba(255,255,255,.1);padding-top:1rem}
 
-/* Measures */
-.measures-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.measure-group {
-  background: var(--cream);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 14px 16px;
-  transition: border-color 0.2s;
-}
-.measure-group:focus-within { border-color: var(--accent); }
-.measure-label {
-  display: flex; justify-content: space-between; align-items: center;
-  font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
-  color: var(--ink-muted); font-weight: 500; margin-bottom: 6px;
-}
-.measure-label .unit-badge {
-  font-size: 11px; color: var(--thread);
-  background: var(--cream-dark); padding: 2px 8px; border-radius: 20px;
-}
-.measure-input {
-  width: 100%; border: none; background: transparent;
-  font-family: 'Cormorant Garamond', serif;
-  font-size: 28px; font-weight: 500; color: var(--ink);
-  outline: none; -moz-appearance: textfield;
-}
-.measure-input::-webkit-outer-spin-button,
-.measure-input::-webkit-inner-spin-button { -webkit-appearance: none; }
-.measure-input::placeholder { color: var(--border-strong); }
-.measure-tip {
-  background: var(--cream-dark); border-radius: var(--radius);
-  padding: 14px 18px; margin-top: 1.5rem;
-  display: flex; gap: 12px; align-items: flex-start;
-}
-.measure-tip svg { width: 20px; height: 20px; stroke: var(--thread); fill: none; stroke-width: 1.8; flex-shrink: 0; margin-top: 2px; }
-.measure-tip p { font-size: 13px; color: var(--ink-soft); line-height: 1.6; }
+.result-grid{display:grid;grid-template-columns:1fr 1.3fr;gap:1.25rem;margin-bottom:1.25rem}
+@media(max-width:600px){.result-grid{grid-template-columns:1fr}.meas-grid{grid-template-columns:1fr}}
+.rcard{background:#fff;border:1px solid rgba(26,23,20,.1);border-radius:12px;padding:1.5rem}
+.rcard-title{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:#8B7355;font-weight:500;margin-bottom:1rem}
+.parts-list{list-style:none}
+.parts-list li{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(26,23,20,.07);font-size:14px}
+.parts-list li:last-child{border-bottom:none}
+.part-dim{font-family:'Cormorant Garamond',serif;font-size:17px;color:#C4622D;font-weight:500}
+.pattern-wrap{background:#F5F0E8;border-radius:8px;padding:1rem;overflow:hidden}
+.pattern-wrap svg{width:100%;display:block}
 
-/* Options */
-.options-row { margin-bottom: 1.75rem; }
-.options-label { font-size: 13px; font-weight: 500; color: var(--ink); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.06em; }
-.chips { display: flex; flex-wrap: wrap; gap: 8px; }
-.chip {
-  padding: 8px 18px; border-radius: 2px;
-  border: 1.5px solid var(--border-strong);
-  font-size: 13px; font-weight: 400; cursor: pointer;
-  color: var(--ink-muted);
-  background: transparent;
-  transition: all 0.15s;
-  font-family: 'DM Sans', sans-serif;
-}
-.chip:hover { border-color: var(--ink); color: var(--ink); }
-.chip.sel { background: var(--ink); color: var(--cream); border-color: var(--ink); }
-.chip.sel.accent { background: var(--accent); border-color: var(--accent); }
+.instr-card{background:#fff;border:1px solid rgba(26,23,20,.1);border-radius:12px;overflow:hidden;margin-bottom:1.25rem}
+.instr-head{background:#F5F0E8;padding:.9rem 1.5rem;font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:500}
+.instr-step{display:flex;gap:1rem;padding:.9rem 1.5rem;border-bottom:1px solid rgba(26,23,20,.07);transition:.15s}
+.instr-step:last-child{border-bottom:none}
+.instr-step:hover{background:#FDFAF6}
+.instr-n{width:26px;height:26px;border-radius:50%;background:#C4622D;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;flex-shrink:0;margin-top:2px}
+.instr-text{font-size:14px;color:#3D3730;line-height:1.6}
 
-/* Nav buttons */
-.step-nav {
-  display: flex; justify-content: space-between; align-items: center;
-  margin-top: 2.5rem; padding-top: 1.5rem;
-  border-top: 1px solid var(--border);
-}
-.btn-back {
-  background: transparent; border: none; cursor: pointer;
-  font-family: 'DM Sans', sans-serif;
-  font-size: 14px; color: var(--ink-muted);
-  display: flex; align-items: center; gap: 6px;
-  padding: 0; transition: color 0.2s;
-}
-.btn-back:hover { color: var(--ink); }
-.btn-back svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+.tip-box{background:#FBF5EF;border-left:3px solid #C4622D;border-radius:0 8px 8px 0;padding:1rem 1.25rem;margin-bottom:1.25rem;font-size:14px;color:#3D3730;line-height:1.6}
+.tip-box strong{color:#C4622D;display:block;font-size:11px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem}
 
-/* Loading */
-.loading-overlay {
-  display: none;
-  text-align: center; padding: 4rem 2rem;
-}
-.loading-overlay.active { display: block; animation: fadeUp 0.3s ease; }
-.thread-loader {
-  width: 60px; height: 60px; margin: 0 auto 2rem;
-  position: relative;
-}
-.thread-loader::after {
-  content: '';
-  position: absolute; inset: 0;
-  border: 3px solid var(--cream-dark);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 0.9s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-.loading-title {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: 28px; font-weight: 500; margin-bottom: 0.5rem;
-}
-.loading-steps { list-style: none; margin-top: 1.5rem; text-align: left; max-width: 300px; margin-inline: auto; }
-.loading-steps li {
-  font-size: 14px; color: var(--ink-muted);
-  padding: 6px 0; display: flex; align-items: center; gap: 10px;
-}
-.loading-steps li::before {
-  content: ''; width: 6px; height: 6px; border-radius: 50%;
-  background: var(--border-strong); flex-shrink: 0;
-}
-.loading-steps li.done::before { background: var(--accent); }
-.loading-steps li.current::before { background: var(--ink); animation: pulse 1s infinite; }
-@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+.action-row{display:flex;gap:10px;flex-wrap:wrap}
+.btn-action{flex:1;min-width:150px;padding:11px 18px;border:1.5px solid rgba(26,23,20,.2);border-radius:4px;background:transparent;font-family:'DM Sans',sans-serif;font-size:13px;color:#1A1714;cursor:pointer;transition:.2s;text-align:center}
+.btn-action:hover{background:#1A1714;color:#F5F0E8;border-color:#1A1714}
+.btn-new{background:#1A1714;color:#F5F0E8;border-color:#1A1714;margin-top:.75rem;width:100%;padding:13px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;border:none;transition:.2s}
+.btn-new:hover{background:#C4622D}
 
-/* Result */
-.result-panel { display: none; }
-.result-panel.active { display: block; animation: fadeUp 0.4s ease; }
-.result-hero {
-  background: var(--ink); color: var(--cream);
-  border-radius: var(--radius-lg);
-  padding: 2.5rem 2.5rem 2rem;
-  margin-bottom: 1.5rem;
-  position: relative; overflow: hidden;
-}
-.result-hero::before {
-  content: '';
-  position: absolute; top: -60px; right: -60px;
-  width: 200px; height: 200px; border-radius: 50%;
-  background: rgba(196,98,45,0.15);
-}
-.result-tag {
-  font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
-  color: var(--accent-light); font-weight: 500; margin-bottom: 0.75rem;
-  display: flex; align-items: center; gap: 6px;
-}
-.result-tag svg { width: 14px; height: 14px; stroke: var(--accent-light); fill: none; stroke-width: 2; }
-.result-model-name {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: 38px; font-weight: 500; margin-bottom: 0.75rem;
-}
-.result-meta {
-  display: flex; flex-wrap: wrap; gap: 1.5rem;
-  font-size: 14px; color: rgba(245,240,232,0.65);
-  border-top: 1px solid rgba(255,255,255,0.1);
-  padding-top: 1.25rem; margin-top: 1.25rem;
-}
-.result-meta span { display: flex; align-items: center; gap: 6px; }
-.result-meta svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; opacity: 0.7; }
+.err{background:#fef2f2;border:1px solid #fca5a5;border-radius:6px;padding:10px 14px;font-size:13px;color:#991b1b;display:none;margin-bottom:.75rem}
+.err.show{display:block}
 
-.result-grid { display: grid; grid-template-columns: 1fr 1.4fr; gap: 1.5rem; margin-bottom: 1.5rem; }
+/* TESTIMONIALS */
+.testi{background:#1A1714;padding:5rem 8vw}
+.testi-title{font-family:'Cormorant Garamond',serif;font-size:clamp(32px,4vw,52px);color:#F5F0E8;margin-bottom:2.5rem}
+.testi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px}
+@media(max-width:700px){.testi-grid{grid-template-columns:1fr}}
+.tcard{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);padding:1.75rem}
+.tcard-stars{color:#E8956A;font-size:13px;letter-spacing:2px;margin-bottom:.75rem}
+.tcard-text{font-family:'Cormorant Garamond',serif;font-size:18px;font-style:italic;color:#F5F0E8;line-height:1.6;margin-bottom:1rem}
+.tcard-author{font-size:12px;color:rgba(245,240,232,.4)}
 
-.result-card {
-  background: var(--white);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 1.75rem;
-}
-.rc-title {
-  font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em;
-  color: var(--thread); font-weight: 500; margin-bottom: 1.25rem;
-  display: flex; align-items: center; gap: 8px;
-}
-.rc-title svg { width: 16px; height: 16px; stroke: var(--thread); fill: none; stroke-width: 1.8; }
-
-.parts-list { list-style: none; }
-.parts-list li {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 9px 0; border-bottom: 1px solid var(--border);
-  font-size: 14px;
-}
-.parts-list li:last-child { border-bottom: none; }
-.part-dims {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: 16px; font-weight: 500; color: var(--accent);
-}
-
-/* SVG Pattern canvas */
-.pattern-canvas {
-  background: var(--cream); border-radius: var(--radius-lg);
-  border: 1px solid var(--border);
-  padding: 1.5rem; overflow: hidden;
-}
-.pattern-canvas svg { width: 100%; display: block; }
-
-/* Instructions */
-.instructions-card {
-  background: var(--white); border: 1px solid var(--border); border-radius: var(--radius-lg);
-  overflow: hidden; margin-bottom: 1.5rem;
-}
-.instr-header {
-  background: var(--cream-dark); padding: 1rem 1.75rem;
-  display: flex; align-items: center; gap: 10px;
-}
-.instr-header h3 {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: 22px; font-weight: 500;
-}
-.instr-body { padding: 0.5rem 0; }
-.instr-step {
-  display: flex; gap: 1.25rem; padding: 1rem 1.75rem;
-  border-bottom: 1px solid var(--border);
-  transition: background 0.15s;
-}
-.instr-step:last-child { border-bottom: none; }
-.instr-step:hover { background: var(--cream); }
-.instr-n {
-  width: 28px; height: 28px; border-radius: 50%;
-  background: var(--accent); color: white;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 13px; font-weight: 500; flex-shrink: 0; margin-top: 1px;
-}
-.instr-text { font-size: 15px; line-height: 1.6; color: var(--ink-soft); }
-
-/* Action bar */
-.action-bar {
-  display: flex; gap: 10px; margin-top: 1rem; flex-wrap: wrap;
-}
-.btn-ask {
-  flex: 1; min-width: 180px;
-  padding: 12px 20px;
-  background: var(--accent-pale);
-  color: var(--accent);
-  border: 1.5px solid var(--accent);
-  border-radius: 2px;
-  font-family: 'DM Sans', sans-serif;
-  font-size: 13px; font-weight: 500; letter-spacing: 0.05em;
-  text-transform: uppercase; cursor: pointer;
-  transition: all 0.2s;
-}
-.btn-ask:hover { background: var(--accent); color: white; }
-.btn-new {
-  flex: 1; min-width: 180px;
-  padding: 12px 20px;
-  background: var(--ink);
-  color: var(--cream);
-  border: 1.5px solid var(--ink);
-  border-radius: 2px;
-  font-family: 'DM Sans', sans-serif;
-  font-size: 13px; font-weight: 500; letter-spacing: 0.05em;
-  text-transform: uppercase; cursor: pointer;
-  transition: all 0.2s;
-}
-.btn-new:hover { background: var(--accent); border-color: var(--accent); }
-
-/* ── TESTIMONIALS ── */
-.testimonials { background: var(--ink); padding: 6rem 8vw; }
-.testimonials h2 { color: var(--cream); margin-bottom: 3rem; }
-.testimonials .section-eyebrow { color: var(--accent-light); }
-.testimonials .section-eyebrow::before { background: var(--accent-light); }
-.testi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5px; }
-.testi-card {
-  background: rgba(255,255,255,0.04);
-  padding: 2rem;
-  border: 1px solid rgba(255,255,255,0.08);
-}
-.testi-stars { color: var(--accent-light); font-size: 14px; letter-spacing: 2px; margin-bottom: 1rem; }
-.testi-text {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: 19px; font-weight: 400; font-style: italic;
-  color: var(--cream); line-height: 1.6; margin-bottom: 1.25rem;
-}
-.testi-author { font-size: 13px; color: rgba(245,240,232,0.5); }
-
-/* ── FOOTER ── */
-footer {
-  background: var(--cream-dark);
-  padding: 3rem 8vw;
-  display: flex; justify-content: space-between; align-items: center;
-  border-top: 1px solid var(--border);
-  flex-wrap: wrap; gap: 1rem;
-}
-.footer-logo {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: 20px; font-weight: 600; color: var(--ink);
-}
-.footer-copy { font-size: 13px; color: var(--ink-muted); }
-
-/* ── RESPONSIVE ── */
-@media (max-width: 900px) {
-  .hero { grid-template-columns: 1fr; min-height: auto; }
-  .hero-right { height: 40vw; min-height: 240px; }
-  .steps-grid, .testi-grid { grid-template-columns: 1fr; }
-  .result-grid { grid-template-columns: 1fr; }
-  .measures-layout { grid-template-columns: 1fr; }
-  .hero-left { padding: 3rem 6vw; }
-  .section { padding: 4rem 6vw; }
-}
-
-/* Error state */
-.error-box {
-  background: #fef2f2; border: 1px solid #fca5a5; border-radius: var(--radius);
-  padding: 14px 18px; margin-bottom: 1rem;
-  font-size: 14px; color: #991b1b; display: none;
-}
-.error-box.show { display: block; }
-
-/* Cropper modal */
-.crop-modal {
-  display: none; position: fixed; inset: 0; z-index: 1000;
-  background: rgba(0,0,0,0.85);
-  align-items: center; justify-content: center;
-  padding: 1rem;
-}
-.crop-modal.open { display: flex; }
-.crop-box {
-  background: var(--white); border-radius: var(--radius-lg);
-  padding: 1.5rem; max-width: 700px; width: 100%;
-  max-height: 90vh; display: flex; flex-direction: column; gap: 1rem;
-}
-.crop-box h3 {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: 22px; font-weight: 500;
-}
-.crop-img-wrap { max-height: 50vh; overflow: hidden; border-radius: 8px; background: #000; }
-.crop-img-wrap img { max-width: 100%; display: block; }
-.crop-actions { display: flex; gap: 10px; justify-content: flex-end; }
-
-/* Description field */
-.desc-field {
-  background: var(--cream); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 14px 16px;
-  margin-top: 1rem; transition: border-color 0.2s;
-}
-.desc-field:focus-within { border-color: var(--accent); }
-.desc-label {
-  font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
-  color: var(--ink-muted); font-weight: 500; margin-bottom: 6px;
-}
-.desc-input {
-  width: 100%; border: none; background: transparent;
-  font-family: 'DM Sans', sans-serif; font-size: 15px;
-  color: var(--ink); outline: none; resize: none;
-  line-height: 1.5;
-}
-.desc-input::placeholder { color: var(--border-strong); }
+footer{background:#EDE5D4;padding:2rem 8vw;display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(26,23,20,.1);flex-wrap:wrap;gap:.5rem}
+.footer-logo{font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:600}
+.footer-copy{font-size:12px;color:#7A6F65}
 </style>
 </head>
 <body>
 
-<!-- NAV -->
 <nav>
-  <a class="nav-logo" href="#">
-    <svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M14 2L14 26M2 14L26 14" stroke="#C4622D" stroke-width="1.5"/>
-      <path d="M6 6L22 22M22 6L6 22" stroke="#1A1714" stroke-width="0.8" opacity="0.3"/>
-      <circle cx="14" cy="14" r="4" stroke="#C4622D" stroke-width="1.5"/>
-    </svg>
-    Выкройка
-  </a>
-  <a class="nav-cta" href="#creator">Создать выкройку</a>
+  <a class="logo" href="#">✦ Выкройка</a>
+  <button class="nav-btn" onclick="document.getElementById('app').scrollIntoView({behavior:'smooth'})">Создать выкройку</button>
 </nav>
 
 <!-- HERO -->
 <section class="hero">
-  <div class="hero-left">
+  <div class="hero-inner">
     <div class="hero-tag">AI-конструктор одежды</div>
     <h1>Шейте то, о чём<br><em>мечтаете</em></h1>
-    <p class="hero-desc">Загрузите фото модели и введите мерки — искусственный интеллект создаст точную выкройку со всеми деталями и пошаговой инструкцией по пошиву.</p>
-    <div class="hero-btns">
-      <a class="btn-primary" href="#creator">Создать выкройку бесплатно</a>
-      <a class="btn-outline" href="#how">Как это работает</a>
-    </div>
-    <div class="hero-stats">
-      <div>
-        <div class="stat-num">3 мин</div>
-        <div class="stat-label">среднее время генерации</div>
-      </div>
-      <div>
-        <div class="stat-num">∞</div>
-        <div class="stat-label">любые модели и фасоны</div>
-      </div>
-      <div>
-        <div class="stat-num">100%</div>
-        <div class="stat-label">под ваши мерки</div>
-      </div>
-    </div>
-  </div>
-  <div class="hero-right">
-    <svg class="pattern-illustration" viewBox="0 0 600 700" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
-      <!-- Background grid lines -->
-      <defs>
-        <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-          <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(26,23,20,0.06)" stroke-width="0.5"/>
-        </pattern>
-      </defs>
-      <rect width="600" height="700" fill="url(#grid)"/>
-      <!-- Large bodice front pattern piece -->
-      <g transform="translate(60,80)">
-        <path d="M40,0 L180,0 L200,20 L210,80 L200,160 L190,240 L100,280 L10,240 L0,160 L-10,80 L0,20 Z"
-          fill="rgba(245,240,232,0.8)" stroke="#1A1714" stroke-width="1.5"/>
-        <path d="M40,0 L180,0" stroke="#C4622D" stroke-width="0.8" stroke-dasharray="6,4"/>
-        <text x="100" y="140" text-anchor="middle" font-family="'Cormorant Garamond',serif" font-size="13" fill="rgba(26,23,20,0.4)">Полочка</text>
-        <text x="100" y="158" text-anchor="middle" font-family="'DM Sans',sans-serif" font-size="10" fill="rgba(26,23,20,0.3)">52 × 68 см</text>
-        <!-- grain line -->
-        <line x1="100" y1="40" x2="100" y2="220" stroke="rgba(26,23,20,0.2)" stroke-width="1"/>
-        <polygon points="100,30 96,45 104,45" fill="rgba(26,23,20,0.2)"/>
-        <polygon points="100,230 96,215 104,215" fill="rgba(26,23,20,0.2)"/>
-        <!-- Notch marks -->
-        <line x1="-5" y1="120" x2="10" y2="120" stroke="#C4622D" stroke-width="1.5"/>
-        <line x1="195" y1="120" x2="210" y2="120" stroke="#C4622D" stroke-width="1.5"/>
-      </g>
-      <!-- Back piece -->
-      <g transform="translate(300,60)">
-        <path d="M30,0 L160,0 L170,15 L180,70 L175,150 L165,230 L90,265 L15,230 L5,150 L0,70 L10,15 Z"
-          fill="rgba(237,229,212,0.9)" stroke="#1A1714" stroke-width="1.5"/>
-        <path d="M30,0 L160,0" stroke="#C4622D" stroke-width="0.8" stroke-dasharray="6,4"/>
-        <text x="90" y="130" text-anchor="middle" font-family="'Cormorant Garamond',serif" font-size="13" fill="rgba(26,23,20,0.4)">Спинка</text>
-        <text x="90" y="148" text-anchor="middle" font-family="'DM Sans',sans-serif" font-size="10" fill="rgba(26,23,20,0.3)">48 × 65 см</text>
-        <line x1="90" y1="35" x2="90" y2="210" stroke="rgba(26,23,20,0.2)" stroke-width="1"/>
-        <polygon points="90,25 86,40 94,40" fill="rgba(26,23,20,0.2)"/>
-        <polygon points="90,220 86,205 94,205" fill="rgba(26,23,20,0.2)"/>
-      </g>
-      <!-- Sleeve piece -->
-      <g transform="translate(80,420)">
-        <path d="M80,0 C110,0 140,5 160,20 L180,80 L175,160 L160,200 L80,215 L0,200 L-15,160 L-20,80 L0,20 C20,5 50,0 80,0 Z"
-          fill="rgba(245,240,232,0.85)" stroke="#1A1714" stroke-width="1.5"/>
-        <text x="80" y="110" text-anchor="middle" font-family="'Cormorant Garamond',serif" font-size="13" fill="rgba(26,23,20,0.4)">Рукав</text>
-        <text x="80" y="128" text-anchor="middle" font-family="'DM Sans',sans-serif" font-size="10" fill="rgba(26,23,20,0.3)">34 × 58 см</text>
-        <line x1="80" y1="20" x2="80" y2="185" stroke="rgba(26,23,20,0.2)" stroke-width="1"/>
-        <polygon points="80,10 76,25 84,25" fill="rgba(26,23,20,0.2)"/>
-        <polygon points="80,195 76,180 84,180" fill="rgba(26,23,20,0.2)"/>
-        <path d="M0,120 Q80,130 160,120" fill="none" stroke="rgba(196,98,45,0.4)" stroke-width="1" stroke-dasharray="4,3"/>
-      </g>
-      <!-- Small collar piece -->
-      <g transform="translate(340,420)">
-        <path d="M0,20 C0,20 40,0 100,0 C160,0 200,20 200,20 L195,50 C195,50 150,65 100,65 C50,65 5,50 5,50 Z"
-          fill="rgba(237,229,212,0.9)" stroke="#1A1714" stroke-width="1.5"/>
-        <text x="100" y="38" text-anchor="middle" font-family="'Cormorant Garamond',serif" font-size="12" fill="rgba(26,23,20,0.4)">Воротник</text>
-        <line x1="100" y1="5" x2="100" y2="58" stroke="rgba(26,23,20,0.15)" stroke-width="0.8" stroke-dasharray="3,3"/>
-      </g>
-      <!-- Decorative dimension lines -->
-      <line x1="55" y1="340" x2="265" y2="340" stroke="rgba(196,98,45,0.3)" stroke-width="0.8"/>
-      <line x1="55" y1="336" x2="55" y2="344" stroke="rgba(196,98,45,0.3)" stroke-width="0.8"/>
-      <line x1="265" y1="336" x2="265" y2="344" stroke="rgba(196,98,45,0.3)" stroke-width="0.8"/>
-      <text x="160" y="354" text-anchor="middle" font-family="'DM Sans',sans-serif" font-size="9" fill="rgba(196,98,45,0.5)">52 см</text>
-      <!-- corner marks -->
-      <g stroke="rgba(26,23,20,0.15)" stroke-width="0.8" fill="none">
-        <path d="M10,10 L10,25 M10,10 L25,10"/>
-        <path d="M590,10 L590,25 M590,10 L575,10"/>
-        <path d="M10,690 L10,675 M10,690 L25,690"/>
-        <path d="M590,690 L590,675 M590,690 L575,690"/>
-      </g>
-    </svg>
+    <p class="hero-desc">Загрузите фото модели, введите мерки — AI создаст точную выкройку со всеми деталями и инструкцией по пошиву.</p>
+    <button class="btn-main" onclick="document.getElementById('app').scrollIntoView({behavior:'smooth'})">Создать выкройку бесплатно</button>
   </div>
 </section>
 
-<!-- HOW IT WORKS -->
-<section class="section" id="how">
-  <div class="section-eyebrow">Принцип работы</div>
-  <h2>Три шага до<br>готовой выкройки</h2>
-  <div class="steps-grid">
-    <div class="step-card">
-      <div class="step-num">01</div>
-      <div class="step-icon">
-        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-      </div>
-      <div class="step-title">Загрузите фото</div>
-      <p class="step-desc">Любое фото понравившейся модели — из журнала, с сайта магазина, из Instagram. AI распознаёт конструкцию и фасон.</p>
-    </div>
-    <div class="step-card">
-      <div class="step-num">02</div>
-      <div class="step-icon">
-        <svg viewBox="0 0 24 24"><path d="M2 12h20M12 2l10 10-10 10"/></svg>
-      </div>
-      <div class="step-title">Введите мерки</div>
-      <p class="step-desc">Шесть простых измерений: грудь, талия, бёдра, рост, длина спины и длина изделия. Подсказки помогут измериться правильно.</p>
-    </div>
-    <div class="step-card">
-      <div class="step-num">03</div>
-      <div class="step-icon">
-        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-      </div>
-      <div class="step-title">Получите выкройку</div>
-      <p class="step-desc">Точная выкройка с размерами всех деталей, схема раскроя и пошаговая инструкция — специально для вашей фигуры и выбранного уровня сложности.</p>
-    </div>
-  </div>
-</section>
+<!-- APP -->
+<section id="app">
+  <div class="app-inner">
+    <div class="app-title">Создайте вашу выкройку</div>
+    <div class="app-sub">Бесплатно, без регистрации</div>
 
-<!-- CREATOR -->
-<section id="creator">
-  <div class="creator-inner">
-    <div class="creator-header">
-      <div class="section-eyebrow" style="justify-content:center;">Конструктор выкроек</div>
-      <h2 style="text-align:center;margin-bottom:0.5rem;">Создайте вашу выкройку</h2>
-      <p>Бесплатно, без регистрации, прямо сейчас</p>
+    <!-- Steps nav -->
+    <div class="steps-nav">
+      <div class="sn-item active" id="sn1"><div class="sn-dot">1</div><div class="sn-label">Фото</div></div>
+      <div class="sn-item" id="sn2"><div class="sn-dot">2</div><div class="sn-label">Мерки</div></div>
+      <div class="sn-item" id="sn3"><div class="sn-dot">3</div><div class="sn-label">Параметры</div></div>
     </div>
 
-    <!-- Progress bar -->
-    <div class="progress-bar" id="progressBar">
-      <div class="pb-step active" id="pb1">
-        <div class="pb-dot">1</div>
-        <div class="pb-label">Фото</div>
-      </div>
-      <div class="pb-step" id="pb2">
-        <div class="pb-dot">2</div>
-        <div class="pb-label">Мерки</div>
-      </div>
-      <div class="pb-step" id="pb3">
-        <div class="pb-dot">3</div>
-        <div class="pb-label">Параметры</div>
-      </div>
-    </div>
+    <!-- STEP 1 -->
+    <div class="step-panel active" id="step1">
+      <div class="step-h">Фото модели</div>
+      <div class="step-sh">Загрузите фото одежды которую хотите сшить</div>
 
-    <!-- STEP 1: Photo -->
-    <div class="creator-step active" id="step1">
-      <div class="step-heading">Загрузите фото модели</div>
-      <div class="step-subheading">Любое изображение одежды, которую хотите сшить</div>
-      <label for="photoInput" class="upload-area" id="uploadArea"
-        ondragover="handleDragOver(event)"
-        ondragleave="handleDragLeave(event)"
-        ondrop="handleDrop(event)"
-        style="cursor:pointer;display:block;">
-        <div class="upload-icon">
-          <svg viewBox="0 0 56 56" xmlns="http://www.w3.org/2000/svg">
-            <path d="M28 36V20M28 20L22 26M28 20L34 26"/>
-            <rect x="8" y="8" width="40" height="40" rx="4"/>
-            <path d="M8 38L18 28L24 34L32 24L48 38"/>
-          </svg>
-        </div>
-        <div class="upload-main">Нажмите или перетащите сюда фото</div>
-        <div class="upload-sub">JPG, PNG, WEBP · до 10 МБ</div>
-      </label>
-      <input type="file" id="photoInput" accept="image/*" style="display:none" onchange="handleFileSelect(this)">
-      <div class="upload-hint-box">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        <span><strong>Подходят</strong> фото из каталогов, скриншоты с сайтов, фото из Instagram. Чем лучше видна конструкция одежды — тем точнее будет выкройка.</span>
+      <div class="upload-box" id="uploadBox" onclick="document.getElementById('fileIn').click()">
+        <div class="upload-icon">📷</div>
+        <div class="upload-main">Нажмите чтобы выбрать фото</div>
+        <div class="upload-sub">JPG, PNG · до 10 МБ</div>
       </div>
-      <div class="desc-field">
-        <div class="desc-label">Опишите что именно нужно сшить (необязательно)</div>
-        <textarea class="desc-input" id="modelDescription" rows="2" placeholder="Например: жилетка без рукавов с V-образным вырезом, застёжка на пуговицы..."></textarea>
-      </div>
+      <input type="file" id="fileIn" accept="image/*" style="display:none" onchange="onFile(this)">
 
-      <div id="cropBtnWrap" style="display:none;margin-top:0.75rem;">
-        <button class="btn-outline" style="width:100%;padding:11px;font-size:13px;" onclick="openCropper()">
-          ✂️ Обрезать фото — выбрать нужное изделие
-        </button>
+      <div class="field" style="margin-top:1.25rem">
+        <div class="field-label">Опишите что именно хотите сшить</div>
+        <textarea id="desc" rows="2" placeholder="Например: жилетка без рукавов с V-вырезом на пуговицах, приталенная блузка с длинным рукавом..."></textarea>
       </div>
 
       <div class="step-nav">
         <div></div>
-        <button class="btn-primary" onclick="goToStep(2)">Далее →</button>
+        <button class="btn-next" onclick="goStep(2)">Далее →</button>
       </div>
     </div>
 
-    <!-- STEP 2: Measures -->
-    <div class="creator-step" id="step2">
-      <div class="step-heading">Ваши мерки</div>
-      <div class="step-subheading">Измерьтесь в нижнем белье, лента без натяжения</div>
-      <div class="measures-layout">
-        <div class="measure-group">
-          <div class="measure-label">Обхват груди <span class="unit-badge">см</span></div>
-          <input class="measure-input" type="number" id="m_chest" placeholder="88" min="60" max="150">
-        </div>
-        <div class="measure-group">
-          <div class="measure-label">Обхват талии <span class="unit-badge">см</span></div>
-          <input class="measure-input" type="number" id="m_waist" placeholder="70" min="50" max="130">
-        </div>
-        <div class="measure-group">
-          <div class="measure-label">Обхват бёдер <span class="unit-badge">см</span></div>
-          <input class="measure-input" type="number" id="m_hips" placeholder="96" min="70" max="150">
-        </div>
-        <div class="measure-group">
-          <div class="measure-label">Рост <span class="unit-badge">см</span></div>
-          <input class="measure-input" type="number" id="m_height" placeholder="168" min="140" max="210">
-        </div>
-        <div class="measure-group">
-          <div class="measure-label">Длина спины <span class="unit-badge">см</span></div>
-          <input class="measure-input" type="number" id="m_back" placeholder="40" min="30" max="55">
-        </div>
-        <div class="measure-group">
-          <div class="measure-label">Желаемая длина <span class="unit-badge">см</span></div>
-          <input class="measure-input" type="number" id="m_len" placeholder="60" min="30" max="130">
-        </div>
-      </div>
-      <div style="display:flex;gap:8px;margin-top:0.75rem;">
-        <button class="btn-outline" style="flex:1;padding:10px;font-size:13px;" onclick="saveMeasures()">💾 Сохранить мерки</button>
-        <button class="btn-outline" style="flex:1;padding:10px;font-size:13px;" onclick="loadMeasures()" id="loadBtn" style="display:none;">📂 Загрузить сохранённые</button>
-      </div>
-      <div id="saveNotice" style="display:none;background:#e8f5e9;border-radius:var(--radius);padding:10px 14px;margin-top:8px;font-size:13px;color:#2e7d32;">✓ Мерки сохранены! В следующий раз нажмите "Загрузить сохранённые".</div>
+    <!-- STEP 2 -->
+    <div class="step-panel" id="step2">
+      <div class="step-h">Ваши мерки</div>
+      <div class="step-sh">Измерьтесь в нижнем белье, лента без натяжения</div>
 
-      <div class="measure-tip">
-        <svg viewBox="0 0 24 24"><path d="M3 12h18M12 3v18"/><circle cx="12" cy="12" r="3"/></svg>
-        <p>Мерная лента должна лежать горизонтально, параллельно полу. Грудь — по наиболее выступающим точкам. Талия — по самому тонкому месту. Бёдра — на 18–20 см ниже талии.</p>
+      <div class="save-row">
+        <button class="btn-sm" onclick="saveMeas()">💾 Сохранить мерки</button>
+        <button class="btn-sm" id="loadBtn" style="display:none" onclick="loadMeas()">📂 Загрузить сохранённые</button>
       </div>
-      <div class="step-nav">
-        <button class="btn-back" onclick="goToStep(1)">
-          <svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-          Назад
-        </button>
-        <button class="btn-primary" onclick="goToStep(3)">Далее →</button>
+      <div class="save-ok" id="saveOk">✓ Мерки сохранены!</div>
+
+      <div class="meas-grid">
+        <div class="meas-item"><div class="meas-label">Обхват груди <span>см</span></div><input class="meas-input" type="number" id="mc" placeholder="88" min="60" max="150"></div>
+        <div class="meas-item"><div class="meas-label">Обхват талии <span>см</span></div><input class="meas-input" type="number" id="mw" placeholder="70" min="50" max="130"></div>
+        <div class="meas-item"><div class="meas-label">Обхват бёдер <span>см</span></div><input class="meas-input" type="number" id="mh" placeholder="96" min="70" max="150"></div>
+        <div class="meas-item"><div class="meas-label">Рост <span>см</span></div><input class="meas-input" type="number" id="mht" placeholder="168" min="140" max="210"></div>
+        <div class="meas-item"><div class="meas-label">Длина спины <span>см</span></div><input class="meas-input" type="number" id="mb" placeholder="40" min="30" max="55"></div>
+        <div class="meas-item"><div class="meas-label">Длина изделия <span>см</span></div><input class="meas-input" type="number" id="ml" placeholder="60" min="20" max="130"></div>
       </div>
-    </div>
-
-    <!-- STEP 3: Options -->
-    <div class="creator-step" id="step3">
-      <div class="step-heading">Параметры выкройки</div>
-      <div class="step-subheading">Настройте под ваш уровень и предпочтения</div>
-
-      <div class="options-row">
-        <div class="options-label">Уровень сложности</div>
-        <div class="chips" id="level-chips">
-          <div class="chip sel" data-val="начинающий" onclick="selectChip(this,'level-chips')">🌱 Начинающий</div>
-          <div class="chip" data-val="средний" onclick="selectChip(this,'level-chips')">✂️ Средний</div>
-          <div class="chip" data-val="опытный" onclick="selectChip(this,'level-chips')">🧵 Опытный</div>
-        </div>
-      </div>
-
-      <div class="options-row">
-        <div class="options-label">Тип ткани</div>
-        <div class="chips" id="fabric-chips">
-          <div class="chip sel" data-val="хлопок" onclick="selectChip(this,'fabric-chips')">Хлопок</div>
-          <div class="chip" data-val="шёлк" onclick="selectChip(this,'fabric-chips')">Шёлк</div>
-          <div class="chip" data-val="трикотаж" onclick="selectChip(this,'fabric-chips')">Трикотаж</div>
-          <div class="chip" data-val="лён" onclick="selectChip(this,'fabric-chips')">Лён</div>
-          <div class="chip" data-val="джинса" onclick="selectChip(this,'fabric-chips')">Джинса</div>
-          <div class="chip" data-val="шерсть" onclick="selectChip(this,'fabric-chips')">Шерсть</div>
-          <div class="chip" data-val="вискоза" onclick="selectChip(this,'fabric-chips')">Вискоза</div>
-        </div>
-      </div>
-
-      <div class="options-row">
-        <div class="options-label">Припуски на швы</div>
-        <div class="chips" id="sa-chips">
-          <div class="chip sel" data-val="1" onclick="selectChip(this,'sa-chips')">1 см</div>
-          <div class="chip" data-val="1.5" onclick="selectChip(this,'sa-chips')">1.5 см</div>
-          <div class="chip" data-val="2" onclick="selectChip(this,'sa-chips')">2 см</div>
-        </div>
-      </div>
-
-      <div class="error-box" id="errorBox">Пожалуйста, введите основные мерки (грудь, талия, бёдра) на предыдущем шаге.</div>
 
       <div class="step-nav">
-        <button class="btn-back" onclick="goToStep(2)">
-          <svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-          Назад
-        </button>
-        <button class="btn-primary" onclick="startGeneration()">
-          ✦ Создать выкройку
-        </button>
+        <button class="btn-back" onclick="goStep(1)">← Назад</button>
+        <button class="btn-next" onclick="goStep(3)">Далее →</button>
       </div>
     </div>
 
-    <!-- Loading -->
-    <div class="loading-overlay" id="loadingOverlay">
-      <div class="thread-loader"></div>
+    <!-- STEP 3 -->
+    <div class="step-panel" id="step3">
+      <div class="step-h">Параметры</div>
+      <div class="step-sh">Настройте под себя</div>
+
+      <div class="opt-label">Уровень сложности</div>
+      <div class="chips" id="cl">
+        <div class="chip sel" data-v="начинающий" onclick="selChip(this,'cl')">🌱 Начинающий</div>
+        <div class="chip" data-v="средний" onclick="selChip(this,'cl')">✂️ Средний</div>
+        <div class="chip" data-v="опытный" onclick="selChip(this,'cl')">🧵 Опытный</div>
+      </div>
+
+      <div class="opt-label">Тип ткани</div>
+      <div class="chips" id="cf">
+        <div class="chip sel" data-v="хлопок" onclick="selChip(this,'cf')">Хлопок</div>
+        <div class="chip" data-v="шёлк" onclick="selChip(this,'cf')">Шёлк</div>
+        <div class="chip" data-v="трикотаж" onclick="selChip(this,'cf')">Трикотаж</div>
+        <div class="chip" data-v="лён" onclick="selChip(this,'cf')">Лён</div>
+        <div class="chip" data-v="джинса" onclick="selChip(this,'cf')">Джинса</div>
+        <div class="chip" data-v="шерсть" onclick="selChip(this,'cf')">Шерсть</div>
+      </div>
+
+      <div class="opt-label">Припуски на швы</div>
+      <div class="chips" id="cs">
+        <div class="chip sel" data-v="1" onclick="selChip(this,'cs')">1 см</div>
+        <div class="chip" data-v="1.5" onclick="selChip(this,'cs')">1.5 см</div>
+        <div class="chip" data-v="2" onclick="selChip(this,'cs')">2 см</div>
+      </div>
+
+      <div class="err" id="errBox">Пожалуйста введите мерки на предыдущем шаге (грудь, талия, бёдра)</div>
+
+      <button class="btn-generate" onclick="generate()">✦ Создать выкройку</button>
+
+      <div class="step-nav" style="border:none;padding:0;margin-top:1rem">
+        <button class="btn-back" onclick="goStep(2)">← Назад</button>
+        <div></div>
+      </div>
+    </div>
+
+    <!-- LOADING -->
+    <div class="loading" id="loading">
+      <div class="spinner"></div>
       <div class="loading-title">Создаём выкройку...</div>
-      <p style="color:var(--ink-muted);font-size:15px;margin-top:0.5rem;" id="loadingSubtext">AI анализирует ваши данные</p>
-      <ul class="loading-steps" id="loadingSteps">
-        <li class="current" id="ls1">Анализ фото и определение модели</li>
-        <li id="ls2">Расчёт деталей по вашим меркам</li>
-        <li id="ls3">Построение выкройки</li>
-        <li id="ls4">Составление инструкции по пошиву</li>
-      </ul>
+      <div class="loading-msg" id="loadMsg">Анализируем данные</div>
     </div>
 
-    <!-- Result -->
-    <div class="result-panel" id="resultPanel">
+    <!-- RESULT -->
+    <div class="result" id="result">
       <div class="result-hero">
-        <div class="result-tag">
-          <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-          Выкройка готова
-        </div>
-        <div class="result-model-name" id="resModelName">Прямое платье</div>
+        <div class="result-tag">✓ Выкройка готова</div>
+        <div class="result-name" id="rName"></div>
+        <div class="result-desc" id="rDesc"></div>
         <div class="result-meta">
-          <span>
-            <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
-            <span id="resFabricAmount">1.8 м ткани</span>
-          </span>
-          <span>
-            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            <span id="resTime">~3 часа работы</span>
-          </span>
-          <span>
-            <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-            <span id="resMeasures">по вашим меркам</span>
-          </span>
+          <span id="rFabric"></span>
+          <span id="rTime"></span>
+          <span id="rMeas"></span>
         </div>
       </div>
 
       <div class="result-grid">
-        <div class="result-card">
-          <div class="rc-title">
-            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
-            Детали кроя
-          </div>
-          <ul class="parts-list" id="resParts"></ul>
+        <div class="rcard">
+          <div class="rcard-title">Детали кроя</div>
+          <ul class="parts-list" id="rParts"></ul>
         </div>
-        <div>
-          <div class="rc-title" style="margin-bottom:0.75rem;">
-            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-            Схема выкройки
-          </div>
-          <div class="pattern-canvas">
-            <svg id="patternSVG" viewBox="0 0 420 280" xmlns="http://www.w3.org/2000/svg"></svg>
+        <div class="rcard">
+          <div class="rcard-title">Схема выкройки</div>
+          <div class="pattern-wrap">
+            <svg id="patSVG" viewBox="0 0 380 240" xmlns="http://www.w3.org/2000/svg"></svg>
           </div>
         </div>
       </div>
 
-      <div class="instructions-card">
-        <div class="instr-header">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8">
-            <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
-          </svg>
-          <h3>Инструкция по пошиву</h3>
-        </div>
-        <div class="instr-body" id="resInstructions"></div>
+      <div class="instr-card">
+        <div class="instr-head">📋 Инструкция по пошиву</div>
+        <div id="rSteps"></div>
       </div>
 
-      <div id="resTipBox" style="display:none;background:var(--accent-pale);border-radius:var(--radius-lg);padding:1.25rem 1.5rem;margin-bottom:1.5rem;border-left:3px solid var(--accent);">
-        <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--accent);font-weight:500;margin-bottom:0.4rem;">Совет мастера</div>
-        <div style="font-size:15px;color:var(--ink-soft);line-height:1.6;" id="resTipText"></div>
+      <div class="tip-box" id="rTip" style="display:none">
+        <strong>Совет мастера</strong>
+        <span id="rTipText"></span>
       </div>
 
-      <div class="action-bar">
-        <button class="btn-ask" onclick="askClaude()">💬 Задать вопрос о выкройке</button>
-        <button class="btn-ask" onclick="getMaterials()">🧵 Список материалов</button>
-        <button class="btn-new" onclick="resetCreator()">✦ Новая выкройка</button>
+      <div class="action-row">
+        <button class="btn-action" onclick="getMats()">🧵 Список материалов</button>
+        <button class="btn-action" onclick="printResult()">🖨 Распечатать</button>
       </div>
+      <button class="btn-new" onclick="resetApp()">✦ Новая выкройка</button>
     </div>
+
   </div>
 </section>
 
 <!-- TESTIMONIALS -->
-<section class="testimonials">
-  <div class="section-eyebrow">Отзывы</div>
-  <h2>Что говорят<br>наши пользователи</h2>
+<section class="testi">
+  <div class="testi-title">Что говорят пользователи</div>
   <div class="testi-grid">
-    <div class="testi-card">
-      <div class="testi-stars">★★★★★</div>
-      <div class="testi-text">«Никогда не думала, что смогу построить выкройку сама. Сервис объяснил всё настолько понятно — с первого раза получилось платье точно по фигуре!»</div>
-      <div class="testi-author">Анна М., Москва</div>
-    </div>
-    <div class="testi-card">
-      <div class="testi-stars">★★★★★</div>
-      <div class="testi-text">«Загрузила фото из Pinterest, и через пару минут у меня была готовая выкройка блузки. Инструкция такая подробная, что даже мои ошибки новичка не испортили результат.»</div>
-      <div class="testi-author">Мария К., Санкт-Петербург</div>
-    </div>
-    <div class="testi-card">
-      <div class="testi-stars">★★★★★</div>
-      <div class="testi-text">«Наконец-то можно шить по своим меркам, а не мучиться с подгонкой стандартных выкроек. Сервис учитывает все особенности фигуры.»</div>
-      <div class="testi-author">Елена В., Екатеринбург</div>
-    </div>
+    <div class="tcard"><div class="tcard-stars">★★★★★</div><div class="tcard-text">«Никогда не думала, что смогу построить выкройку сама. С первого раза получилось платье точно по фигуре!»</div><div class="tcard-author">Анна М., Москва</div></div>
+    <div class="tcard"><div class="tcard-stars">★★★★★</div><div class="tcard-text">«Загрузила фото из Pinterest и через пару минут получила готовую выкройку блузки. Инструкция очень подробная!»</div><div class="tcard-author">Мария К., Санкт-Петербург</div></div>
+    <div class="tcard"><div class="tcard-stars">★★★★★</div><div class="tcard-text">«Наконец-то шью по своим меркам, не мучаясь с подгонкой стандартных выкроек.»</div><div class="tcard-author">Елена В., Екатеринбург</div></div>
   </div>
 </section>
 
-<!-- FOOTER -->
 <footer>
   <div class="footer-logo">✦ Выкройка</div>
-  <div class="footer-copy">AI-конструктор одежды · 2024 · Бесплатно</div>
+  <div class="footer-copy">AI-конструктор · Бесплатно</div>
 </footer>
 
-<!-- Crop Modal -->
-<div class="crop-modal" id="cropModal">
-  <div class="crop-box">
-    <h3>Выберите область с изделием</h3>
-    <p style="font-size:13px;color:var(--ink-muted);">Обрежьте фото так, чтобы было видно только нужное изделие</p>
-    <div class="crop-img-wrap">
-      <img id="cropImage" src="" alt="Кадрирование">
-    </div>
-    <div class="crop-actions">
-      <button class="btn-outline" style="padding:10px 20px;font-size:13px;" onclick="closeCropper()">Отмена</button>
-      <button class="btn-primary" style="padding:10px 24px;font-size:13px;" onclick="applyCrop()">✓ Применить обрезку</button>
-    </div>
-  </div>
-</div>
-
 <script>
-let uploadedImageData = null;
-let currentStep = 1;
+let imgData = null;
+let curStep = 1;
 
-// Drag & drop
-function handleDragOver(e) {
-  e.preventDefault();
-  document.getElementById('uploadArea').classList.add('drag');
-}
-function handleDragLeave(e) {
-  document.getElementById('uploadArea').classList.remove('drag');
-}
-function handleDrop(e) {
-  e.preventDefault();
-  document.getElementById('uploadArea').classList.remove('drag');
-  const file = e.dataTransfer.files[0];
-  if (file && file.type.startsWith('image/')) processFile(file);
-}
-function handleFileSelect(input) {
-  if (input.files[0]) processFile(input.files[0]);
-}
-let cropperInstance = null;
-let originalImageData = null;
-
-function processFile(file) {
+// File upload
+document.getElementById('fileIn').addEventListener('change', function() {
+  const file = this.files[0];
+  if (!file) return;
   const reader = new FileReader();
-  reader.onload = e => {
-    uploadedImageData = e.target.result;
-    originalImageData = e.target.result;
-    const area = document.getElementById('uploadArea');
-    area.innerHTML = '<img src="' + e.target.result + '" alt="Загруженное фото модели" style="max-height:280px;max-width:100%;border-radius:8px;object-fit:contain;pointer-events:none;"><div style="margin-top:12px;font-size:13px;color:var(--accent);font-weight:500;pointer-events:none;">✓ Фото загружено · нажмите чтобы изменить</div>';
-    area.classList.add('has-image');
-    document.getElementById('cropBtnWrap').style.display = 'block';
+  reader.onload = function(e) {
+    imgData = e.target.result;
+    const box = document.getElementById('uploadBox');
+    box.classList.add('loaded');
+    box.innerHTML = '<img src="' + imgData + '" alt="фото"><div class="upload-change">✓ Фото загружено · нажмите чтобы изменить</div>';
+    box.onclick = function() { document.getElementById('fileIn').click(); };
   };
   reader.readAsDataURL(file);
+});
+
+function onFile(input) {
+  // handled by event listener above
 }
 
-function openCropper() {
-  const modal = document.getElementById('cropModal');
-  const img = document.getElementById('cropImage');
-  img.src = originalImageData || uploadedImageData;
-  modal.classList.add('open');
-  setTimeout(() => {
-    if (cropperInstance) { cropperInstance.destroy(); cropperInstance = null; }
-    cropperInstance = new Cropper(img, {
-      viewMode: 1, autoCropArea: 0.8,
-      movable: true, zoomable: true, rotatable: false,
-    });
-  }, 200);
-}
-
-function closeCropper() {
-  document.getElementById('cropModal').classList.remove('open');
-  if (cropperInstance) { cropperInstance.destroy(); cropperInstance = null; }
-}
-
-function applyCrop() {
-  if (!cropperInstance) return;
-  const canvas = cropperInstance.getCroppedCanvas({ maxWidth: 1200, maxHeight: 1200 });
-  uploadedImageData = canvas.toDataURL('image/jpeg', 0.9);
-  const area = document.getElementById('uploadArea');
-  area.innerHTML = '<img src="' + uploadedImageData + '" alt="Обрезанное фото" style="max-height:280px;max-width:100%;border-radius:8px;object-fit:contain;pointer-events:none;"><div style="margin-top:12px;font-size:13px;color:var(--accent);font-weight:500;pointer-events:none;">✓ Фото обрезано · нажмите чтобы изменить</div>';
-  closeCropper();
-}
-
-// Navigation
-function goToStep(n) {
-  document.getElementById('step'+currentStep).classList.remove('active');
-  document.getElementById('pb'+currentStep).classList.remove('active');
-  if (n > currentStep) document.getElementById('pb'+currentStep).classList.add('done');
-  currentStep = n;
+// Steps
+function goStep(n) {
+  document.getElementById('step'+curStep).classList.remove('active');
+  document.getElementById('sn'+curStep).classList.remove('active');
+  if (n > curStep) document.getElementById('sn'+curStep).classList.add('done');
+  curStep = n;
   document.getElementById('step'+n).classList.add('active');
-  document.getElementById('pb'+n).classList.add('active');
-  document.getElementById('creator').scrollIntoView({ behavior: 'smooth', block: 'start' });
-  if (n === 2) checkSavedMeasures();
+  document.getElementById('sn'+n).classList.add('active');
+  document.getElementById('app').scrollIntoView({behavior:'smooth',block:'start'});
+  if (n === 2) checkSaved();
 }
 
 // Chips
-function selectChip(el, groupId) {
-  document.querySelectorAll('#'+groupId+' .chip').forEach(c => c.classList.remove('sel'));
+function selChip(el, gid) {
+  document.querySelectorAll('#'+gid+' .chip').forEach(c => c.classList.remove('sel'));
   el.classList.add('sel');
 }
-
-function getChipVal(groupId) {
-  const sel = document.querySelector('#'+groupId+' .chip.sel');
-  return sel ? sel.dataset.val : '';
+function chipVal(gid) {
+  const s = document.querySelector('#'+gid+' .chip.sel');
+  return s ? s.dataset.v : '';
 }
 
-// Generation
-async function startGeneration() {
-  const chest = document.getElementById('m_chest').value;
-  const waist = document.getElementById('m_waist').value;
-  const hips = document.getElementById('m_hips').value;
-  if (!chest || !waist || !hips) {
-    const eb = document.getElementById('errorBox');
-    eb.classList.add('show');
-    setTimeout(() => eb.classList.remove('show'), 4000);
-    return;
+// Measures save/load
+function saveMeas() {
+  const d = {c:document.getElementById('mc').value,w:document.getElementById('mw').value,h:document.getElementById('mh').value,ht:document.getElementById('mht').value,b:document.getElementById('mb').value,l:document.getElementById('ml').value};
+  localStorage.setItem('meas',JSON.stringify(d));
+  const ok = document.getElementById('saveOk');
+  ok.style.display='block';
+  document.getElementById('loadBtn').style.display='block';
+  setTimeout(()=>ok.style.display='none',2500);
+}
+function loadMeas() {
+  const s = localStorage.getItem('meas');
+  if (!s) return;
+  const d = JSON.parse(s);
+  document.getElementById('mc').value=d.c||'';
+  document.getElementById('mw').value=d.w||'';
+  document.getElementById('mh').value=d.h||'';
+  document.getElementById('mht').value=d.ht||'';
+  document.getElementById('mb').value=d.b||'';
+  document.getElementById('ml').value=d.l||'';
+}
+function checkSaved() {
+  if (localStorage.getItem('meas')) {
+    document.getElementById('loadBtn').style.display='block';
+    loadMeas();
   }
-
-  const height = document.getElementById('m_height').value || 168;
-  const back = document.getElementById('m_back').value || 40;
-  const len = document.getElementById('m_len').value || 60;
-  const level = getChipVal('level-chips');
-  const fabric = getChipVal('fabric-chips');
-  const sa = getChipVal('sa-chips');
-
-  // Hide steps, show loader
-  ['step1','step2','step3'].forEach(id => document.getElementById(id).classList.remove('active'));
-  document.getElementById('progressBar').style.display = 'none';
-  const lo = document.getElementById('loadingOverlay');
-  lo.classList.add('active');
-  document.getElementById('creator').scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-  // Animate loading steps
-  const lsIds = ['ls1','ls2','ls3','ls4'];
-  let lsIdx = 0;
-  const lsInterval = setInterval(() => {
-    if (lsIdx > 0) {
-      document.getElementById(lsIds[lsIdx-1]).classList.remove('current');
-      document.getElementById(lsIds[lsIdx-1]).classList.add('done');
-    }
-    if (lsIdx < lsIds.length) {
-      document.getElementById(lsIds[lsIdx]).classList.add('current');
-      lsIdx++;
-    }
-  }, 1800);
-
-  const userDesc = document.getElementById('modelDescription').value.trim();
-  // Force the item type into model_name instruction
-  const forceItem = userDesc ? `КРИТИЧЕСКИ ВАЖНО: пользователь хочет "${userDesc}". model_name ОБЯЗАН содержать "${userDesc}". Если на фото этот предмет — опиши его. Построй выкройку именно для: ${userDesc}.` : '';
-    const imageContext = uploadedImageData
-    ? `${forceItem} Внимательно посмотри на фото. Определи тип изделия, фасон, конструкцию.`
-    : `${forceItem} Фото не загружено. ${userDesc ? '' : 'Создай базовую выкройку.'}\`;
-
-  const prompt = `Ты — профессиональный конструктор одежды с 20-летним опытом. Создай точную выкройку по следующим данным.
-
-${imageContext}
-
-Мерки:
-- Обхват груди: ${chest} см
-- Обхват талии: ${waist} см
-- Обхват бёдер: ${hips} см
-- Рост: ${height} см
-- Длина спины: ${back} см
-- Желаемая длина: ${len} см
-
-Параметры:
-- Уровень сложности: ${level}
-- Ткань: ${fabric}
-- Припуски на швы: ${sa} см
-
-Верни ТОЛЬКО JSON (без markdown, без пояснений вне JSON):
-{
-  "model_name": "Название изделия",
-  "description": "Краткое описание фасона (1 предложение)",
-  "fabric_amount": "X.X метра (ширина 140 см)",
-  "time_estimate": "примерное время пошива",
-  "parts": [
-    {
-      "name": "Название детали",
-      "width": число,
-      "height": число,
-      "qty": число,
-      "note": "краткое примечание (необязательно)"
-    }
-  ],
-  "steps": [
-    "Подробное описание шага 1",
-    "Подробное описание шага 2"
-  ],
-  "tip": "Главный совет для уровня ${level}"
 }
 
-Правила:
-- Детали: минимум 3, максимум 6 (спинка, полочка, рукав если нужен, воротник/пояс)
-- Размеры деталей должны быть рассчитаны математически по меркам с учётом припусков ${sa} см и прибавок на свободу
-- Шагов: 7-9, очень подробно для уровня ${level}
-- model_name — конкретное название (например: "Прямое платье-рубашка", "Блузка с воротником-стойкой")`;
+// Generate
+async function generate() {
+  const chest = document.getElementById('mc').value;
+  const waist = document.getElementById('mw').value;
+  const hips  = document.getElementById('mh').value;
+  if (!chest||!waist||!hips) {
+    const e=document.getElementById('errBox'); e.classList.add('show'); setTimeout(()=>e.classList.remove('show'),3500); return;
+  }
+  const height = document.getElementById('mht').value||168;
+  const back   = document.getElementById('mb').value||40;
+  const len    = document.getElementById('ml').value||60;
+  const level  = chipVal('cl');
+  const fabric = chipVal('cf');
+  const sa     = chipVal('cs');
+  const desc   = document.getElementById('desc').value.trim();
+
+  // Hide steps show loader
+  ['step1','step2','step3'].forEach(id=>document.getElementById(id).classList.remove('active'));
+  document.querySelector('.steps-nav').style.display='none';
+  document.getElementById('result').classList.remove('show');
+  const ld = document.getElementById('loading');
+  ld.classList.add('show');
+
+  const msgs = ['Анализируем фото и описание...','Рассчитываем детали по меркам...','Строим выкройку...','Пишем инструкцию...'];
+  let mi=0;
+  const iv = setInterval(()=>{ if(mi<msgs.length-1){mi++;document.getElementById('loadMsg').textContent=msgs[mi];} },2000);
+
+  // Build prompt based on Zhilevskaya textbook formulas
+  const itemHint = desc ? `КРИТИЧЕСКИ ВАЖНО: пользователь хочет сшить "${desc}". model_name ОБЯЗАН точно отражать именно это изделие: "${desc}". ЗАПРЕЩЕНО называть изделие иначе.` : '';
+  const photoHint = imgData ? 'На фото одежда — определи точно тип изделия, фасон, конструктивные особенности (рукава/без рукавов, воротник, застёжка, карманы).' : 'Фото не загружено.';
+
+  const Cg=parseFloat(chest), Ct=parseFloat(waist), Cb=parseFloat(hips), R=parseFloat(height), Dsp=parseFloat(back), L=parseFloat(len), SA=parseFloat(sa);
+
+  // ЖИЛЕВСКАЯ: формулы построения основы лифа
+  // Ширина спинки (½) = Сг/4 - 1 см
+  const w_spinka_half = Math.round((Cg/4 - 1) * 10) / 10;
+  // Ширина переда (½) = Сг/4 + 1 см
+  const w_polochka_half = Math.round((Cg/4 + 1) * 10) / 10;
+  // Линия нижней точки проймы = Дспины/2 + 1 см
+  const armhole_depth = Math.round((Dsp/2 + 1) * 10) / 10;
+  // Горловина спинки: ширина = Сш/6, глубина = Сш/16 (Сш ≈ Сг/3 * 0.7 + 20 примерно)
+  const Ssh = Math.round(Cg * 0.38); // приблизительный обхват шеи
+  const neck_width = Math.round((Ssh/6) * 10) / 10;
+  const neck_depth_back = Math.round((Ssh/16) * 10) / 10;
+  const neck_depth_front = Math.round((Ssh/16 + 1.5) * 10) / 10;
+  // Раствор вытачки = Сг/20
+  const dart_width = Math.round((Cg/20) * 10) / 10;
+  // Раствор талиевых вытачек = (Сг - Ст) / 2 для ½ выкройки
+  const waist_dart_total = Math.round(((Cg - Ct) / 2) * 10) / 10;
+
+  // ЖИЛЕВСКАЯ: формулы для юбки
+  // ½ заднего полотнища = (Сб/2 - 1) / 2
+  const skirt_back_half = Math.round(((Cb/2 - 1) / 2) * 10) / 10;
+  // ½ переднего полотнища = (Сб/2 + 1) / 2
+  const skirt_front_half = Math.round(((Cb/2 + 1) / 2) * 10) / 10;
+  // Раствор вытачек юбки = (Сб/2 - Ст/2) разделить на части
+  const skirt_dart = Math.round(((Cb/2 - Ct/2)) * 10) / 10;
+
+  // ЖИЛЕВСКАЯ: формулы для рукава
+  // Глубина проймы ≈ Дспины/2 + 1
+  const proy_depth = armhole_depth;
+  // АС рукава = глубина проймы - глубина проймы/5
+  const sleeve_AC = Math.round((proy_depth - proy_depth/5) * 10) / 10;
+  // Ширина рукава внизу (манжета) = Сзапястья + 3 ≈ 17 + 3 = 20 (стандарт)
+  const sleeve_width_top = Math.round((Cg/4 + 2) * 10) / 10;
+
+  // Определяем тип изделия для выбора деталей
+  const isSkirt = desc && (desc.includes('юбк'));
+  const isVest = desc && (desc.includes('жилет') || desc.includes('жилетк') || desc.includes('безрукав'));
+  const isBlouse = desc && (desc.includes('блуз') || desc.includes('блузк') || desc.includes('рубашк'));
+  const isJacket = desc && (desc.includes('пиджак') || desc.includes('жакет') || desc.includes('пальт'));
+
+  let Pg = isVest || isJacket ? 3 : 5; // прибавка к груди
+  let Pt = 3; // прибавка к талии
+  let Pb = 3; // прибавка к бёдрам
+
+  const prompt = \`Ты профессиональный конструктор одежды, обученный по методике Терезы Жилевской.
+\${itemHint}
+\${photoHint}
+
+МЕРКИ КЛИЕНТА:
+Сг (обхват груди) = \${chest} см
+Ст (обхват талии) = \${waist} см
+Сб (обхват бёдер) = \${hips} см
+Рост = \${height} см
+Длина спины до талии (Дсп) = \${back} см
+Желаемая длина изделия = \${len} см
+
+ПАРАМЕТРЫ: сложность — \${level}, ткань — \${fabric}, припуски на швы — \${sa} см
+
+ГОТОВЫЕ РАСЧЁТЫ ПО ФОРМУЛАМ ЖИЛЕВСКОЙ — ИСПОЛЬЗУЙ ЭТИ ТОЧНЫЕ ЦИФРЫ:
+
+ЛИФ (спинка и полочка):
+— ½ ширины спинки = Сг/4 - 1 = \${w_spinka_half} см → полная ширина спинки = \${Math.round(w_spinka_half*2)} см
+— ½ ширины переда = Сг/4 + 1 = \${w_polochka_half} см → полная ширина переда = \${Math.round(w_polochka_half*2)} см
+— Длина спинки = \${Dsp} см (+ \${SA}*2 припуски = \${Math.round(Dsp+SA*2)} см на деталь)
+— Длина переда = \${Math.round(Dsp+2)} см (перед длиннее спины на 2-4 см из-за груди)
+— Нижняя точка проймы = Дсп/2 + 1 = \${armhole_depth} см от талии
+— Ширина горловины спинки = Сш/6 ≈ \${neck_width} см
+— Глубина горловины спинки = Сш/16 ≈ \${neck_depth_back} см
+— Глубина горловины переда = Сш/16 + 1.5 ≈ \${neck_depth_front} см
+— Раствор плечевой вытачки переда = Сг/20 = \${dart_width} см
+— Суммарный раствор талиевых вытачек (½ выкройки) = \${waist_dart_total} см
+— Прибавки: к груди Пг=\${Pg}см, к талии Пт=\${Pt}см, к бёдрам Пб=\${Pb}см
+
+РУКАВ (если нужен для данного изделия):
+— Ширина оката (верхняя часть) ≈ \${sleeve_width_top} см
+— АС (высота оката) = глубина проймы - глубина/5 = \${sleeve_AC} см
+— Длина рукава ≈ рост × 0.32 = \${Math.round(R*0.32)} см (длинный) / \${Math.round(R*0.18)} см (короткий)
+— Прибавка на окат рукава: блузка 1-2 см, пиджак 2-4 см
+
+ЮБКА (если нужна):
+— ½ переднего полотнища = (Сб/2 + 1)/2 = \${skirt_front_half} см
+— ½ заднего полотнища = (Сб/2 - 1)/2 = \${skirt_back_half} см  
+— Суммарный раствор вытачек = Сб/2 - Ст/2 = \${skirt_dart} см
+— Высота бёдер = 20 см от талии
+
+ВАЖНО по методике Жилевской:
+1. Выкройка-основа строится БЕЗ прибавок — прибавки добавляются при моделировании
+2. Перед всегда длиннее спинки на 2-4 см
+3. Не путать линию нижней точки проймы с линией груди
+4. На ½ выкройки: все горизонтальные мерки делить на 2
+
+Верни ТОЛЬКО валидный JSON без markdown:
+{"model_name":"ТОЧНОЕ название (должно совпадать с запросом пользователя)","description":"описание фасона","fabric_amount":"X.X метра","time_estimate":"время","parts":[{"name":"название","width":число,"height":число,"qty":число,"note":"по методике Жилевской"}],"steps":["подробный шаг 1","шаг 2"],"tip":"совет из методики Жилевской"}
+
+Правила: 3-6 деталей, 7-8 шагов. Размеры берёт из ГОТОВЫХ РАСЧЁТОВ выше.\`;
+
+  // Build API content
+  let apiContent;
+  if (imgData) {
+    const b64 = imgData.split(',')[1];
+    const mime = imgData.match(/data:([^;]+);/)[1];
+    apiContent = [
+      {type:'image',source:{type:'base64',media_type:mime,data:b64}},
+      {type:'text',text:prompt}
+    ];
+  } else {
+    apiContent = prompt;
+  }
 
   try {
-    // Debug: show what's being sent
-    console.log('=== ОТПРАВКА В API ===');
-    console.log('Описание:', userDesc);
-    console.log('Фото загружено:', !!uploadedImageData);
-    console.log('imageContext:', imageContext);
-
-    // Build message content - include image if uploaded
-    let msgContent;
-    if (uploadedImageData) {
-      const base64 = uploadedImageData.split(',')[1];
-      const mimeMatch = uploadedImageData.match(/data:([^;]+);/);
-      const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
-      msgContent = [
-        { type: 'image', source: { type: 'base64', media_type: mimeType, data: base64 } },
-        { type: 'text', text: prompt }
-      ];
-    } else {
-      msgContent = prompt;
-    }
-
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1500,
-        messages: [{ role: 'user', content: msgContent }]
-      })
+    const resp = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1500,messages:[{role:'user',content:apiContent}]})
     });
-    clearInterval(lsInterval);
-    const data = await response.json();
-    const rawText = data.content.map(b => b.text || '').join('');
-    const clean = rawText.replace(/```json\s*/g,'').replace(/```\s*/g,'').trim();
+    clearInterval(iv);
+    ld.classList.remove('show');
+    const data = await resp.json();
+    if(data.error){throw new Error(data.error.message);}
+    const txt = data.content.map(b=>b.text||'').join('');
+    const clean = txt.replace(/```json\s*/g,'').replace(/```\s*/g,'').trim();
     const parsed = JSON.parse(clean);
-    lo.classList.remove('active');
-    renderResult(parsed, { chest, waist, hips, height });
-  } catch (err) {
-    clearInterval(lsInterval);
-    lo.classList.remove('active');
+    showResult(parsed,{chest,waist,hips});
+  } catch(err) {
+    clearInterval(iv);
+    ld.classList.remove('show');
     // Fallback
-    renderResult(getFallback(chest, waist, hips, len, sa, level, fabric), { chest, waist, hips, height });
+    showResult(getFallback(desc,chest,waist,hips,len,sa,level),{chest,waist,hips});
   }
 }
 
-function getFallback(chest, waist, hips, len, sa, level, fabric) {
-  const c = parseInt(chest)||88, w = parseInt(waist)||70, h = parseInt(hips)||96, l = parseInt(len)||60;
-  const half = (v) => Math.round(v/2 + parseInt(sa||1)*2 + 2);
-  return {
-    model_name: "Прямое платье",
-    description: "Классическое прямое платье с вырезом-лодочкой",
-    fabric_amount: `${(l/100*2 + 0.5).toFixed(1)} метра`,
-    time_estimate: level === 'начинающий' ? '4–5 часов' : '2–3 часа',
-    parts: [
-      { name: "Перед", width: half(c), height: l + parseInt(sa||1)*2, qty: 1 },
-      { name: "Спинка", width: half(c), height: l + parseInt(sa||1)*2, qty: 1 },
-      { name: "Пояс", width: w + parseInt(sa||1)*4, height: 6, qty: 1 }
-    ],
-    steps: [
-      "Постирайте и отутюжьте ткань для предотвращения усадки.",
-      `Разложите ткань вдвое лицом внутрь. Перенесите детали выкройки на ткань с помощью мела или маркера, отступив ${sa} см от краёв для припусков.`,
-      "Вырежьте все детали строго по линиям раскроя. Следите за направлением долевой нити.",
-      "Сшейте боковые швы правой стороной ткани внутрь. Припуски заутюжьте.",
-      "Обработайте все срезы оверлоком или зигзагообразной строчкой.",
-      "Притачайте пояс по линии талии, совмещая центры.",
-      "Подшейте низ изделия: подогните край на 1 см дважды и прострочите."
-    ],
-    tip: "Перед раскроем обязательно проверьте прямой угол детали с помощью угольника — это залог ровных швов."
-  };
-}
-
-function renderResult(data, measures) {
-  document.getElementById('resModelName').textContent = data.model_name;
-  document.getElementById('resFabricAmount').textContent = data.fabric_amount || '—';
-  document.getElementById('resTime').textContent = data.time_estimate || '—';
-  document.getElementById('resMeasures').textContent = `грудь ${measures.chest}, талия ${measures.waist}, бёдра ${measures.hips} см`;
-
-  // Parts list
-  const partsEl = document.getElementById('resParts');
-  partsEl.innerHTML = (data.parts || []).map(p =>
-    `<li>
-      <span>${p.name}${p.note ? `<br><span style="font-size:12px;color:var(--ink-muted)">${p.note}</span>` : ''}</span>
-      <span class="part-dims">${p.width}×${p.height}<span style="font-size:12px;color:var(--thread);margin-left:4px;">×${p.qty}</span></span>
-    </li>`
-  ).join('');
-
-  // Draw SVG pattern
-  drawSVGPattern(data.parts || []);
-
-  // Instructions
-  const instrEl = document.getElementById('resInstructions');
-  instrEl.innerHTML = (data.steps || []).map((s, i) =>
-    `<div class="instr-step">
-      <div class="instr-n">${i+1}</div>
-      <div class="instr-text">${s}</div>
-    </div>`
-  ).join('');
-
-  // Tip
-  if (data.tip) {
-    document.getElementById('resTipText').textContent = data.tip;
-    document.getElementById('resTipBox').style.display = 'block';
-  }
-
-  document.getElementById('resultPanel').classList.add('active');
-  document.getElementById('creator').scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-  // Store for follow-up
-  window._lastPattern = data;
-}
-
-function drawSVGPattern(parts) {
-  const svg = document.getElementById('patternSVG');
-  const colors = [
-    {fill:'rgba(196,98,45,0.12)',stroke:'#C4622D'},
-    {fill:'rgba(26,23,20,0.06)',stroke:'#3D3730'},
-    {fill:'rgba(139,115,85,0.15)',stroke:'#8B7355'},
-    {fill:'rgba(196,98,45,0.07)',stroke:'#C4622D'},
-    {fill:'rgba(26,23,20,0.1)',stroke:'#1A1714'},
-    {fill:'rgba(139,115,85,0.2)',stroke:'#8B7355'},
+function getFallback(desc,chest,waist,hips,len,sa) {
+  const name = desc || 'Базовая выкройка';
+  const c=parseFloat(chest)||88,w=parseFloat(waist)||70,h=parseFloat(hips)||96,l=parseFloat(len)||60,s=parseFloat(sa)||1;
+  const noSleeve = desc&&(desc.includes('жилет')||desc.includes('топ')||desc.includes('юбк'));
+  const parts = [
+    {name:'Спинка',width:Math.round(c/2+3+s),height:Math.round(l+s*2),qty:1,note:'Долевая нить вертикально'},
+    {name:'Полочка',width:Math.round(c/2+3+s),height:Math.round(l+s*2),qty:1,note:'Долевая нить вертикально'},
   ];
-  const vw = 420, vh = 280;
-  const maxW = Math.max(...parts.map(p=>p.width), 1);
-  const maxH = Math.max(...parts.map(p=>p.height), 1);
-  const scale = Math.min((vw - 40) / (maxW * 1.5), (vh - 40) / maxH, 1.8);
-  let content = '';
-  // background grid
-  content += `<defs><pattern id="sg" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(26,23,20,0.05)" stroke-width="0.5"/></pattern></defs>`;
-  content += `<rect width="${vw}" height="${vh}" fill="url(#sg)"/>`;
-
-  let x = 20, y = 20;
-  const rowH = Math.round(maxH * scale) + 20;
-  parts.forEach((p, i) => {
-    const w = Math.round(p.width * scale);
-    const h = Math.round(p.height * scale);
-    if (x + w > vw - 10 && i > 0) { x = 20; y += rowH; }
-    const c = colors[i % colors.length];
-    content += `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${c.fill}" stroke="${c.stroke}" stroke-width="1.2" rx="2"/>`;
-    // grain line
-    const gx = x + w/2;
-    content += `<line x1="${gx}" y1="${y+8}" x2="${gx}" y2="${y+h-8}" stroke="${c.stroke}" stroke-width="0.8" opacity="0.4"/>`;
-    content += `<polygon points="${gx},${y+4} ${gx-3},${y+12} ${gx+3},${y+12}" fill="${c.stroke}" opacity="0.4"/>`;
-    content += `<polygon points="${gx},${y+h-4} ${gx-3},${y+h-12} ${gx+3},${y+h-12}" fill="${c.stroke}" opacity="0.4"/>`;
-    // Label
-    const ty = y + h/2 - 8;
-    content += `<text x="${x+w/2}" y="${ty}" text-anchor="middle" font-family="Cormorant Garamond,serif" font-size="12" fill="rgba(26,23,20,0.6)">${p.name}</text>`;
-    content += `<text x="${x+w/2}" y="${ty+16}" text-anchor="middle" font-family="DM Sans,sans-serif" font-size="9" fill="rgba(26,23,20,0.4)">${p.width}×${p.height} см</text>`;
-    // notch marks
-    content += `<line x1="${x}" y1="${y+h*0.4}" x2="${x+5}" y2="${y+h*0.4}" stroke="${c.stroke}" stroke-width="1.5"/>`;
-    content += `<line x1="${x+w}" y1="${y+h*0.4}" x2="${x+w-5}" y2="${y+h*0.4}" stroke="${c.stroke}" stroke-width="1.5"/>`;
-    x += w + 16;
-  });
-  svg.innerHTML = content;
-}
-
-function askClaude() {
-  const modelName = document.getElementById('resModelName').textContent;
-  const question = prompt(`Задайте вопрос о выкройке "${modelName}":`);
-  if (question && window._lastPattern) {
-    alert('Для полноценных ответов откройте в Claude.ai и спросите: "' + question + '"');
-  }
-}
-
-function getMaterials() {
-  if (!window._lastPattern) return;
-  const d = window._lastPattern;
-  const partsList = (d.parts||[]).map(p=>`${p.name}: ${p.width}×${p.height} см (×${p.qty})`).join('\n');
-  const text = `Список материалов для: ${d.model_name}\n\nТкань: ${d.fabric_amount}\n\nДетали:\n${partsList}\n\nТакже понадобится:\n• Нитки в цвет ткани\n• Швейные иглы\n• Мел или маркер для ткани\n• Ножницы для ткани\n• Утюг и гладильная доска\n• Сантиметровая лента\n• Булавки\n${d.model_name.includes('юбк') || d.model_name.includes('брюк') ? '• Молния 20 см\n• Резинка или пояс' : '• Пуговицы или застёжка'}`;
-  alert(text);
-}
-
-function saveMeasures() {
-  const data = {
-    chest: document.getElementById('m_chest').value,
-    waist: document.getElementById('m_waist').value,
-    hips: document.getElementById('m_hips').value,
-    height: document.getElementById('m_height').value,
-    back: document.getElementById('m_back').value,
-    len: document.getElementById('m_len').value
+  if(!noSleeve) parts.push({name:'Рукав',width:Math.round((c+5)/4+3),height:Math.round(55+s*2),qty:2,note:'Симметрично'});
+  parts.push({name:'Пояс',width:Math.round(w+4),height:6,qty:1,note:'Поперечная нить'});
+  return {
+    model_name:name,description:'Базовая выкройка по вашим меркам',fabric_amount:`${(l/100*2+0.5).toFixed(1)} метра`,time_estimate:'3-4 часа',
+    parts,
+    steps:['Постирайте и отутюжьте ткань перед раскроем для усадки.',`Перенесите детали на ткань с помощью мела, добавив припуски ${sa}см по всем срезам.`,'Вырежьте все детали точно по линиям раскроя.',`Сшейте боковые швы с изнаночной стороны, припуск ${sa}см.`,'Обработайте все срезы оверлоком или зигзагом.','Обработайте горловину и проймы обтачкой или косой бейкой.','Подшейте низ изделия, отступив 3 см.','Проутюжьте готовое изделие через влажную ткань.'],
+    tip:'Перед раскроем сделайте образец строчки на лоскуте ткани — так вы подберёте правильное натяжение нити.'
   };
-  localStorage.setItem('sewing_measures', JSON.stringify(data));
-  const notice = document.getElementById('saveNotice');
-  notice.style.display = 'block';
-  document.getElementById('loadBtn').style.display = 'block';
-  setTimeout(() => notice.style.display = 'none', 3000);
 }
 
-function loadMeasures() {
-  const saved = localStorage.getItem('sewing_measures');
-  if (!saved) return;
-  const data = JSON.parse(saved);
-  document.getElementById('m_chest').value = data.chest || '';
-  document.getElementById('m_waist').value = data.waist || '';
-  document.getElementById('m_hips').value = data.hips || '';
-  document.getElementById('m_height').value = data.height || '';
-  document.getElementById('m_back').value = data.back || '';
-  document.getElementById('m_len').value = data.len || '';
+function showResult(d, meas) {
+  document.getElementById('rName').textContent = d.model_name||'Выкройка';
+  document.getElementById('rDesc').textContent = d.description||'';
+  document.getElementById('rFabric').textContent = '📐 '+( d.fabric_amount||'—');
+  document.getElementById('rTime').textContent = '⏱ '+(d.time_estimate||'—');
+  document.getElementById('rMeas').textContent = `📏 грудь ${meas.chest}, талия ${meas.waist}, бёдра ${meas.hips} см`;
+
+  const pl = document.getElementById('rParts');
+  pl.innerHTML=(d.parts||[]).map(p=>`<li><span>${p.name}${p.note?'<br><small style="color:#7A6F65">'+p.note+'</small>':''}</span><span class="part-dim">${p.width}×${p.height}<small style="color:#8B7355;font-size:12px"> ×${p.qty}</small></span></li>`).join('');
+
+  drawSVG(d.parts||[]);
+
+  const sl = document.getElementById('rSteps');
+  sl.innerHTML=(d.steps||[]).map((s,i)=>`<div class="instr-step"><div class="instr-n">${i+1}</div><div class="instr-text">${s}</div></div>`).join('');
+
+  if(d.tip){document.getElementById('rTipText').textContent=d.tip;document.getElementById('rTip').style.display='block';}
+
+  window._pat=d;
+  document.getElementById('result').classList.add('show');
+  document.getElementById('app').scrollIntoView({behavior:'smooth',block:'start'});
 }
 
-function checkSavedMeasures() {
-  if (localStorage.getItem('sewing_measures')) {
-    document.getElementById('loadBtn').style.display = 'block';
-    loadMeasures();
-  }
-}
-
-function resetCreator() {
-  document.getElementById('resultPanel').classList.remove('active');
-  document.getElementById('progressBar').style.display = 'flex';
-  currentStep = 1;
-  ['step1','step2','step3'].forEach((id,i) => {
-    document.getElementById(id).classList.toggle('active', i===0);
+function drawSVG(parts) {
+  const svg = document.getElementById('patSVG');
+  const cols=['rgba(196,98,45,0.2)','rgba(26,23,20,0.08)','rgba(139,115,85,0.18)','rgba(196,98,45,0.1)','rgba(26,23,20,0.12)','rgba(139,115,85,0.22)'];
+  const strokes=['#C4622D','#3D3730','#8B7355','#C4622D','#3D3730','#8B7355'];
+  const vw=380,vh=240;
+  const maxW=Math.max(...parts.map(p=>p.width),1);
+  const maxH=Math.max(...parts.map(p=>p.height),1);
+  const sc=Math.min((vw-40)/(maxW*1.6),(vh-40)/maxH,1.6);
+  let html='<defs><pattern id="g" width="15" height="15" patternUnits="userSpaceOnUse"><path d="M15 0L0 0 0 15" fill="none" stroke="rgba(26,23,20,0.04)" stroke-width="0.5"/></pattern></defs><rect width="'+vw+'" height="'+vh+'" fill="url(#g)"/>';
+  let x=15,y=15;
+  const rowH=Math.round(maxH*sc)+20;
+  parts.forEach((p,i)=>{
+    const w=Math.round(p.width*sc),h=Math.round(p.height*sc);
+    if(x+w>vw-10&&i>0){x=15;y+=rowH;}
+    const c=cols[i%cols.length],s=strokes[i%strokes.length];
+    html+=`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${c}" stroke="${s}" stroke-width="1.2" rx="2"/>`;
+    const gx=x+w/2;
+    html+=`<line x1="${gx}" y1="${y+6}" x2="${gx}" y2="${y+h-6}" stroke="${s}" stroke-width="0.7" opacity="0.4"/>`;
+    html+=`<polygon points="${gx},${y+2} ${gx-3},${y+10} ${gx+3},${y+10}" fill="${s}" opacity="0.35"/>`;
+    html+=`<polygon points="${gx},${y+h-2} ${gx-3},${y+h-10} ${gx+3},${y+h-10}" fill="${s}" opacity="0.35"/>`;
+    const ty=y+h/2-6;
+    html+=`<text x="${x+w/2}" y="${ty}" text-anchor="middle" font-family="Cormorant Garamond,serif" font-size="11" fill="rgba(26,23,20,0.65)">${p.name}</text>`;
+    html+=`<text x="${x+w/2}" y="${ty+14}" text-anchor="middle" font-family="DM Sans,sans-serif" font-size="8.5" fill="rgba(26,23,20,0.4)">${p.width}×${p.height}см</text>`;
+    html+=`<line x1="${x}" y1="${y+h*0.38}" x2="${x+5}" y2="${y+h*0.38}" stroke="${s}" stroke-width="1.5"/>`;
+    html+=`<line x1="${x+w}" y1="${y+h*0.38}" x2="${x+w-5}" y2="${y+h*0.38}" stroke="${s}" stroke-width="1.5"/>`;
+    x+=w+14;
   });
-  [1,2,3].forEach(i => {
-    const pb = document.getElementById('pb'+i);
-    pb.classList.remove('active','done');
+  svg.innerHTML=html;
+}
+
+function getMats() {
+  if(!window._pat) return;
+  const d=window._pat;
+  const parts=(d.parts||[]).map(p=>`• ${p.name}: ${p.width}×${p.height}см × ${p.qty}шт`).join('\n');
+  alert(`МАТЕРИАЛЫ ДЛЯ: ${d.model_name}\n\nТкань: ${d.fabric_amount}\n\nДетали:\n${parts}\n\nИнструменты:\n• Швейная машина\n• Нитки в цвет ткани\n• Ножницы для ткани\n• Мел или маркер\n• Сантиметровая лента\n• Булавки\n• Утюг и гладильная доска\n• Оверлок (или зигзаг)`);
+}
+
+function printResult() { window.print(); }
+
+function resetApp() {
+  imgData=null;
+  curStep=1;
+  document.getElementById('result').classList.remove('show');
+  document.querySelector('.steps-nav').style.display='flex';
+  ['step1','step2','step3'].forEach((id,i)=>{
+    const el=document.getElementById(id);
+    el.classList.toggle('active',i===0);
   });
-  document.getElementById('pb1').classList.add('active');
-  uploadedImageData = null;
-  originalImageData = null;
-  document.getElementById('modelDescription').value = '';
-  document.getElementById('cropBtnWrap').style.display = 'none';
-  const area = document.getElementById('uploadArea');
-  area.innerHTML = '<div class="upload-icon"><svg viewBox="0 0 56 56" xmlns="http://www.w3.org/2000/svg"><path d="M28 36V20M28 20L22 26M28 20L34 26"/><rect x="8" y="8" width="40" height="40" rx="4"/><path d="M8 38L18 28L24 34L32 24L48 38"/></svg></div><div class="upload-main">Нажмите или перетащите сюда фото</div><div class="upload-sub">JPG, PNG, WEBP · до 10 МБ</div>';
-  area.classList.remove('has-image');
-  document.getElementById('creator').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  [1,2,3].forEach(i=>{
+    const sn=document.getElementById('sn'+i);
+    sn.classList.remove('active','done');
+  });
+  document.getElementById('sn1').classList.add('active');
+  const box=document.getElementById('uploadBox');
+  box.classList.remove('loaded');
+  box.innerHTML='<div class="upload-icon">📷</div><div class="upload-main">Нажмите чтобы выбрать фото</div><div class="upload-sub">JPG, PNG · до 10 МБ</div>';
+  box.onclick=()=>document.getElementById('fileIn').click();
+  document.getElementById('desc').value='';
+  document.getElementById('rTip').style.display='none';
+  document.getElementById('app').scrollIntoView({behavior:'smooth',block:'start'});
 }
 </script>
 </body>
