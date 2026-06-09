@@ -191,12 +191,12 @@ footer{background:#EDE5D4;padding:2rem 8vw;display:flex;justify-content:space-be
       <div class="step-h">Фото модели</div>
       <div class="step-sh">Загрузите фото одежды которую хотите сшить</div>
 
-      <div class="upload-box" id="uploadBox" onclick="document.getElementById('fileIn').click()">
+      <label for="fileIn" class="upload-box" id="uploadBox" style="display:block;cursor:pointer;">
         <div class="upload-icon">📷</div>
         <div class="upload-main">Нажмите чтобы выбрать фото</div>
         <div class="upload-sub">JPG, PNG · до 10 МБ</div>
-      </div>
-      <input type="file" id="fileIn" accept="image/*" style="display:none" onchange="onFile(this)">
+      </label>
+      <input type="file" id="fileIn" accept="image/*" style="display:none">
 
       <div class="field" style="margin-top:1.25rem">
         <div class="field-label">Опишите что именно хотите сшить</div>
@@ -355,15 +355,12 @@ document.getElementById('fileIn').addEventListener('change', function() {
     imgData = e.target.result;
     const box = document.getElementById('uploadBox');
     box.classList.add('loaded');
-    box.innerHTML = '<img src="' + imgData + '" alt="фото"><div class="upload-change">✓ Фото загружено · нажмите чтобы изменить</div>';
-    box.onclick = function() { document.getElementById('fileIn').click(); };
+    box.innerHTML = '<img src="' + imgData + '" alt="фото" style="pointer-events:none"><div class="upload-change" style="pointer-events:none">✓ Фото загружено · нажмите чтобы изменить</div>';
   };
   reader.readAsDataURL(file);
 });
 
-function onFile(input) {
-  // handled by event listener above
-}
+function onFile(input) {}
 
 // Steps
 function goStep(n) {
@@ -666,7 +663,6 @@ function resetApp() {
   const box=document.getElementById('uploadBox');
   box.classList.remove('loaded');
   box.innerHTML='<div class="upload-icon">📷</div><div class="upload-main">Нажмите чтобы выбрать фото</div><div class="upload-sub">JPG, PNG · до 10 МБ</div>';
-  box.onclick=()=>document.getElementById('fileIn').click();
   document.getElementById('desc').value='';
   document.getElementById('rTip').style.display='none';
   document.getElementById('app').scrollIntoView({behavior:'smooth',block:'start'});
