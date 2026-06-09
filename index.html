@@ -442,54 +442,98 @@ async function generate() {
   const iv = setInterval(()=>{ if(mi<msgs.length-1){mi++;document.getElementById('loadMsg').textContent=msgs[mi];} },2000);
 
   // Build prompt
-  const itemHint = desc ? 'КРИТИЧЕСКИ ВАЖНО: пользователь хочет сшить "' + desc + '". model_name ОБЯЗАН точно называть именно: "' + desc + '". ЗАПРЕЩЕНО называть иначе.' : '';
-  const photoHint = imgData ? 'На фото одежда — определи точно тип изделия, фасон, особенности (рукава/без, воротник, застёжка).' : 'Фото не загружено.';
+  const itemHint = desc ? 'КРИТИЧЕСКИ ВАЖНО: пользователь хочет сшить "' + desc + '". model_name ОБЯЗАН точно называть именно: "' + desc + '".' : '';
+  const photoHint = imgData ? 'На фото одежда — определи точно тип изделия и все конструктивные особенности.' : 'Фото не загружено.';
 
   const Cg=parseFloat(chest)||88, Ct=parseFloat(waist)||70, Cb=parseFloat(hips)||96;
   const R=parseFloat(height)||168, Dsp=parseFloat(back)||40, L=parseFloat(len)||60, SA=parseFloat(sa)||1;
 
-  // Формулы Жилевской
-  const w_sp = Math.round(Cg/4 - 1);
-  const w_pol = Math.round(Cg/4 + 1);
-  const armhole = Math.round(Dsp/2 + 1);
-  const Ssh = Math.round(Cg * 0.38);
+  // Определяем тип изделия
+  const d = desc ? desc.toLowerCase() : '';
+  const isPants    = d.includes('брюк') || d.includes('шорт') || d.includes('штан');
+  const isSkirt    = d.includes('юбк');
+  const isVest     = d.includes('жилет') || d.includes('безрукав');
+  const isTop      = d.includes('топ') || d.includes('майк');
+  const isBlouse   = d.includes('блуз') || d.includes('рубашк') || d.includes('блузк');
+  const isJacket   = d.includes('пиджак') || d.includes('жакет') || d.includes('пальт');
+  const hasSleeve  = !isPants && !isSkirt && !isVest && !isTop;
+  const hasWaist   = isPants || isSkirt;
+  const hasBodice  = !isPants && !isSkirt;
+
+  // Прибавки
+  const Pg = (isVest || isJacket) ? 3 : 5;
+
+  // === ФОРМУЛЫ ЖИЛЕВСКОЙ ===
+  // Лиф
+  const w_sp   = Math.round(Cg/4 - 1);
+  const w_pol  = Math.round(Cg/4 + 1);
+  const Ssh    = Math.round(Cg * 0.38);
   const neck_w = Math.round(Ssh/6 * 10)/10;
-  const neck_d_back = Math.round(Ssh/16 * 10)/10;
+  const neck_d = Math.round(Ssh/16 * 10)/10;
   const dart_w = Math.round(Cg/20 * 10)/10;
   const waist_dart = Math.round((Cg - Ct) / 2 * 10)/10;
-  const skirt_front = Math.round((Cb/2 + 1) / 2 * 10)/10;
-  const skirt_back = Math.round((Cb/2 - 1) / 2 * 10)/10;
-  const skirt_dart = Math.round((Cb/2 - Ct/2) * 10)/10;
+  const armhole = Math.round(Dsp/2 + 1);
+
+  // Рукав (Жилевская)
   const sleeve_top = Math.round(Cg/4 + 2);
-  const sleeve_len = Math.round(R * 0.32);
+  const sleeve_len_long = Math.round(R * 0.32);
+  const sleeve_len_short = Math.round(R * 0.18);
 
-  const isVest = desc && (desc.includes('жилет') || desc.includes('безрукав'));
-  const Pg = isVest ? 3 : 5;
+  // Юбка (Жилевская)
+  const skirt_front = Math.round((Cb/2 + 1) / 2 * 10)/10;
+  const skirt_back  = Math.round((Cb/2 - 1) / 2 * 10)/10;
+  const skirt_dart  = Math.round((Cb/2 - Ct/2) * 10)/10;
+  const waist_w     = Math.round(Ct + 4);
 
-  const lines = [
-    'Ты профессиональный конструктор одежды по методике Терезы Жилевской.',
-    itemHint,
-    photoHint,
-    '',
-    'МЕРКИ: Сг=' + chest + ' Ст=' + waist + ' Сб=' + hips + ' Рост=' + height + ' Дсп=' + back + ' Длина=' + len + ' см',
-    'ПАРАМЕТРЫ: ' + level + ', ' + fabric + ', припуски ' + sa + ' см',
-    '',
-    'РАСЧЁТЫ ПО ЖИЛЕВСКОЙ (используй эти числа):',
-    'Спинка: ширина=' + (w_sp*2) + 'см высота=' + (Math.round(Dsp+SA*2)) + 'см',
-    'Полочка: ширина=' + (w_pol*2) + 'см высота=' + (Math.round(Dsp+2+SA*2)) + 'см',
-    'Горловина: ширина=' + neck_w + 'см глубина спинки=' + neck_d_back + 'см',
-    'Нижняя точка проймы=' + armhole + 'см от талии',
-    'Раствор плечевой вытачки=' + dart_w + 'см',
-    'Раствор талиевых вытачек=' + waist_dart + 'см (для половины выкройки)',
-    'Рукав: ширина оката=' + sleeve_top + 'см длина=' + sleeve_len + 'см',
-    'Юбка: перед=' + skirt_front + 'см зад=' + skirt_back + 'см раствор вытачек=' + skirt_dart + 'см',
-    '',
-    'Верни ТОЛЬКО JSON без markdown:',
-    '{"model_name":"ТОЧНОЕ название как просил пользователь","description":"фасон","fabric_amount":"X.X метра","time_estimate":"время","parts":[{"name":"деталь","width":число,"height":число,"qty":число,"note":"примечание"}],"steps":["шаг 1","шаг 2"],"tip":"совет"}',
-    '',
-    'ПРАВИЛА: 3-6 деталей, 7-8 шагов. Используй числа из расчётов выше. НИКОГДА не называй изделие "Прямое платье" если пользователь просил другое.'
-  ];
-  const prompt = lines.filter(l => l !== null && l !== undefined).join('\n');
+  // Брюки (стандартные формулы)
+  const seat        = Math.round(Cb/4 + 3);       // ширина детали по бёдрам
+  const rise        = Math.round(Cb/4 + 2);        // высота сидения ≈ Сб/4 + 2
+  const pants_len   = Math.round(L);
+  const knee_w      = Math.round(Cb/4 - 2);        // ширина по колену
+  const bottom_w    = Math.round(Cb/4 - 4);        // ширина низа прямых брюк
+  const pants_waist = Math.round(Ct/4 + 1 + SA);   // ширина по талии для детали
+
+  // Строим строки промпта в зависимости от изделия
+  const lines = ['Ты профессиональный конструктор одежды по методике Терезы Жилевской.', itemHint, photoHint, ''];
+  lines.push('МЕРКИ: Сг=' + chest + ' Ст=' + waist + ' Сб=' + hips + ' Рост=' + height + ' Дсп=' + back + ' Длина=' + len + ' см');
+  lines.push('ПАРАМЕТРЫ: ' + level + ', ' + fabric + ', припуски ' + sa + ' см');
+  lines.push('');
+
+  if (isPants) {
+    lines.push('ТИП ИЗДЕЛИЯ: БРЮКИ. Нужны ТОЛЬКО детали брюк — НЕТ лифа, НЕТ рукавов, НЕТ горловины!');
+    lines.push('РАСЧЁТЫ ДЛЯ БРЮК:');
+    lines.push('Переднее полотнище: ширина по бёдрам=' + seat + 'см, ширина по талии=' + pants_waist + 'см, высота сидения=' + rise + 'см, длина=' + pants_len + 'см, ширина низа=' + bottom_w + 'см');
+    lines.push('Заднее полотнище: ширина по бёдрам=' + (seat+2) + 'см (зад шире на 2см), ширина по талии=' + (pants_waist+1) + 'см, длина=' + pants_len + 'см');
+    lines.push('Пояс: ширина=' + waist_w + 'см высота=8см');
+    lines.push('Детали: ТОЛЬКО [переднее полотнище ×2, заднее полотнище ×2, пояс ×1]. Карман опционально.');
+  } else if (isSkirt) {
+    lines.push('ТИП ИЗДЕЛИЯ: ЮБКА. Нужны ТОЛЬКО детали юбки — НЕТ лифа, НЕТ рукавов!');
+    lines.push('РАСЧЁТЫ ЖИЛЕВСКОЙ ДЛЯ ЮБКИ:');
+    lines.push('Переднее полотнище ×1: ширина=' + (skirt_front*2+SA*2) + 'см высота=' + (L+SA*2) + 'см');
+    lines.push('Заднее полотнище ×1: ширина=' + (skirt_back*2+SA*2) + 'см высота=' + (L+SA*2) + 'см');
+    lines.push('Пояс ×1: ширина=' + waist_w + 'см высота=8см');
+    lines.push('Раствор вытачек=' + skirt_dart + 'см');
+  } else {
+    lines.push('ТИП ИЗДЕЛИЯ: ПЛЕЧЕВОЕ (лиф). ' + (isVest ? 'БЕЗ рукавов!' : hasSleeve ? 'С рукавами.' : ''));
+    lines.push('РАСЧЁТЫ ЖИЛЕВСКОЙ:');
+    lines.push('Спинка ×1: ширина=' + (w_sp*2+SA*2) + 'см высота=' + (Dsp+SA*2) + 'см');
+    lines.push('Полочка ×2: ширина=' + (w_pol+SA*2) + 'см высота=' + (Dsp+2+SA*2) + 'см');
+    lines.push('Горловина: ширина=' + neck_w + 'см глубина=' + neck_d + 'см');
+    lines.push('Вытачка плечевая=' + dart_w + 'см, вытачки талии=' + waist_dart + 'см');
+    if (hasSleeve) {
+      lines.push('Рукав ×2: ширина оката=' + sleeve_top + 'см длина=' + (isBlouse ? sleeve_len_long : sleeve_len_short) + 'см');
+    }
+    if (!isVest && !isTop) {
+      lines.push('Пояс/низ: ' + waist_w + 'см × 6см если нужен');
+    }
+  }
+
+  lines.push('');
+  lines.push('Верни ТОЛЬКО JSON без markdown:');
+  lines.push('{"model_name":"ТОЧНОЕ название как просил пользователь","description":"описание фасона и конструкции","fabric_amount":"X.X метра","time_estimate":"время","parts":[{"name":"деталь","width":число,"height":число,"qty":число,"note":"примечание"}],"steps":["шаг 1"],"tip":"совет"}');
+  lines.push('ПРАВИЛА: 3-5 деталей только для данного типа изделия, 7-8 шагов, используй числа из расчётов.');
+
+  const prompt = lines.join('\n');
 
   // Build API content
   let apiContent;
